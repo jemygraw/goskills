@@ -9,7 +9,7 @@ A Go package to parse Claude Skill packages from a directory structure. This par
 - Captures the Markdown body of the skill.
 - Discovers resource files in `scripts/`, `references/`, and `assets/` directories.
 - Packaged as a reusable Go module.
-- Includes a command-line interface (`skill-cli`) for managing and inspecting skills.
+- Includes command-line interfaces for managing and inspecting skills.
 
 ## Installation
 
@@ -48,20 +48,22 @@ func main() {
 }
 ```
 
-## Command-Line Interface (skill-cli)
+## Command-Line Interfaces
 
-This project includes a standalone CLI tool for inspecting skills, located in the `cmd/skill-cli` directory.
+This project provides two separate command-line tools:
 
-### Building the CLI
+### 1. Skill Management CLI (`goskills-cli`)
 
+Located in `cmd/skill-cli`, this tool helps you inspect and manage your local Claude skills.
+
+#### Building `goskills-cli`
 You can build the executable from the project root:
 ```shell
 go build -o goskills-cli ./cmd/skill-cli
 ```
 
-### Commands
-
-Here are the available commands:
+#### Commands
+Here are the available commands for `goskills-cli`:
 
 #### list
 Lists all valid skills in a given directory.
@@ -91,6 +93,34 @@ Lists all the files that make up a skill package.
 Searches for skills by name or description within a directory. The search is case-insensitive.
 ```shell
 ./goskills-cli search ./examples/skills "web app"
+```
+
+### 2. Skill Runner CLI (`goskills-runner`)
+
+Located in `cmd/skill-runner`, this tool simulates the Claude skill-use workflow by integrating with Large Language Models (LLMs) like OpenAI's models.
+
+#### Building `goskills-runner`
+You can build the executable from the project root:
+```shell
+go build -o goskills-runner ./cmd/skill-runner
+```
+
+#### Commands
+Here are the available commands for `goskills-runner`:
+
+#### run
+Processes a user request by first discovering available skills, then asking an LLM to select the most appropriate one, and finally executing the selected skill by feeding its content to the LLM as a system prompt.
+
+**Requires the `OPENAI_API_KEY` environment variable to be set.**
+
+```shell
+# Example with default OpenAI model (gpt-4o)
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+./goskills-runner run "create an algorithm that generates abstract art"
+
+# Example with a custom OpenAI-compatible model and API base URL
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+./goskills-runner run --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 "create an algorithm that generates abstract art"
 ```
 
 ## Running Tests
