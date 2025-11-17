@@ -13,7 +13,7 @@ var searchCmd = &cobra.Command{
 	Short: "Searches for skills by name or description.",
 	Long: `The search command scans a directory for valid skill packages and returns a list
 	of skills where the name or description contains the provided query text.
-	The search is case-insensitive.`, 
+	The search is case-insensitive.`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		skillsRoot := args[0]

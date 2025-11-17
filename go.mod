@@ -1,6 +1,6 @@
 module github.com/smallnest/goskills
 
-go 1.25.3
+go 1.25.0
 
 require (
 	github.com/sashabaranov/go-openai v1.41.2

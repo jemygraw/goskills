@@ -19,7 +19,7 @@ and manage Claude Skill packages.`,
 func Execute() {
 	// Disable the default completion command
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
-	
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
