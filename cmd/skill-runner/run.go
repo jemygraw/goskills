@@ -6,18 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/smallnest/goskills"
-	"github.com/smallnest/goskills/tool" // Import the new tool package
+	"github.com/smallnest/goskills/config" // Import the new config package
+	"github.com/smallnest/goskills/tool"   // Import the new tool package
 	"github.com/spf13/cobra"
-)
-
-var (
-	modelName string
-	apiBase   string
 )
 
 var runCmd = &cobra.Command{
@@ -34,24 +29,30 @@ You can specify a custom model and API base URL using flags.`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		userPrompt := strings.Join(args, " ")
-		skillsPath := "./examples/skills" // Hardcoded for now
+
+		// --- LOAD CONFIG ---
+		cfg, err := config.LoadConfig(cmd)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
 
 		// --- PRE-FLIGHT CHECK ---
-		apiKey := os.Getenv("OPENAI_API_KEY")
-		if apiKey == "" {
+		if cfg.APIKey == "" {
 			return errors.New("OPENAI_API_KEY environment variable is not set")
 		}
 
-		config := openai.DefaultConfig(apiKey)
-		if apiBase != "" {
-			config.BaseURL = apiBase
+		openaiConfig := openai.DefaultConfig(cfg.APIKey)
+		if cfg.APIBase != "" {
+			openaiConfig.BaseURL = cfg.APIBase
 		}
-		client := openai.NewClientWithConfig(config)
+		client := openai.NewClientWithConfig(openaiConfig)
 		ctx := context.Background()
 
 		// --- STEP 1: SKILL DISCOVERY ---
-		fmt.Println("🔎 Discovering available skills...")
-		availableSkills, err := discoverSkills(skillsPath)
+		if cfg.Verbose {
+			fmt.Printf("🔎 Discovering available skills in %s...\n", cfg.SkillsDir)
+		}
+		availableSkills, err := discoverSkills(cfg.SkillsDir)
 		if err != nil {
 			return fmt.Errorf("failed to discover skills: %w", err)
 		}
@@ -62,7 +63,7 @@ You can specify a custom model and API base URL using flags.`,
 
 		// --- STEP 2: SKILL SELECTION ---
 		fmt.Println("🧠 Asking LLM to select the best skill...")
-		selectedSkillName, err := selectSkill(ctx, client, userPrompt, availableSkills)
+		selectedSkillName, err := selectSkill(ctx, client, cfg, userPrompt, availableSkills)
 		if err != nil {
 			return fmt.Errorf("failed during skill selection: %w", err)
 		}
@@ -78,7 +79,7 @@ You can specify a custom model and API base URL using flags.`,
 		fmt.Println("🚀 Executing skill (with potential tool calls)...")
 		fmt.Println(strings.Repeat("-", 40))
 
-		err = executeSkillWithTools(ctx, client, userPrompt, selectedSkill)
+		err = executeSkillWithTools(ctx, client, cfg, userPrompt, selectedSkill)
 		if err != nil {
 			return fmt.Errorf("failed during skill execution: %w", err)
 		}
@@ -103,7 +104,7 @@ func discoverSkills(skillsRoot string) (map[string]goskills.SkillPackage, error)
 	return skills, nil
 }
 
-func selectSkill(ctx context.Context, client *openai.Client, userPrompt string, skills map[string]goskills.SkillPackage) (string, error) {
+func selectSkill(ctx context.Context, client *openai.Client, cfg *config.Config, userPrompt string, skills map[string]goskills.SkillPackage) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("User Request: " + "" + userPrompt + "" + "\n\n")
 	sb.WriteString("Available Skills:\n")
@@ -113,7 +114,7 @@ func selectSkill(ctx context.Context, client *openai.Client, userPrompt string, 
 	sb.WriteString("\nBased on the user request, which single skill is the most appropriate to use? Respond with only the name of the skill.")
 
 	req := openai.ChatCompletionRequest{
-		Model: modelName, // Use configurable model name
+		Model: cfg.Model, // Use configurable model name
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
@@ -139,135 +140,8 @@ func selectSkill(ctx context.Context, client *openai.Client, userPrompt string, 
 	return skillName, nil
 }
 
-// getToolDefinitions returns the OpenAI tool schemas for the available Go tools.
-func getToolDefinitions() []openai.Tool {
-	return []openai.Tool{
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "run_shell_script",
-				Description: "Executes a shell script and returns its combined stdout and stderr. Use this for general shell commands.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"scriptPath": map[string]interface{}{
-							"type":        "string",
-							"description": "The path to the shell script to execute.",
-						},
-						"args": map[string]interface{}{
-							"type":        "array",
-							"description": "A list of string arguments to pass to the script.",
-							"items": map[string]interface{}{
-								"type": "string",
-							},
-						},
-					},
-					"required": []string{"scriptPath"},
-				},
-			},
-		},
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "run_python_script",
-				Description: "Executes a Python script and returns its combined stdout and stderr.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"scriptPath": map[string]interface{}{
-							"type":        "string",
-							"description": "The path to the Python script to execute.",
-						},
-						"args": map[string]interface{}{
-							"type":        "array",
-							"description": "A list of string arguments to pass to the script.",
-							"items": map[string]interface{}{
-								"type": "string",
-							},
-						},
-					},
-					"required": []string{"scriptPath"},
-				},
-			},
-		},
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "read_file",
-				Description: "Reads the content of a file and returns it as a string.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"filePath": map[string]interface{}{
-							"type":        "string",
-							"description": "The path to the file to read.",
-						},
-					},
-					"required": []string{"filePath"},
-				},
-			},
-		},
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "write_file",
-				Description: "Writes the given content to a file. If the file does not exist, it will be created. If it exists, its content will be truncated.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"filePath": map[string]interface{}{
-							"type":        "string",
-							"description": "The path to the file to write.",
-						},
-						"content": map[string]interface{}{
-							"type":        "string",
-							"description": "The content to write to the file.",
-						},
-					},
-					"required": []string{"filePath", "content"},
-				},
-			},
-		},
-		// New tools implemented directly
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "duckduckgo_search",
-				Description: "Performs a DuckDuckGo search for the given query and returns a summary or related topics.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"query": map[string]interface{}{
-							"type":        "string",
-							"description": "The search query.",
-						},
-					},
-					"required": []string{"query"},
-				},
-			},
-		},
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "wikipedia_search",
-				Description: "Performs a search on Wikipedia for the given query and returns a summary of the relevant entry.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"query": map[string]interface{}{
-							"type":        "string",
-							"description": "The search query for Wikipedia.",
-						},
-					},
-					"required": []string{"query"},
-				},
-			},
-		},
-	}
-}
-
 // executeToolCall executes a single tool call and returns its output.
-func executeToolCall(toolCall openai.ToolCall) (string, error) {
+func executeToolCall(toolCall openai.ToolCall, scriptMap map[string]string) (string, error) {
 	var toolOutput string
 	var err error
 
@@ -327,7 +201,27 @@ func executeToolCall(toolCall openai.ToolCall) (string, error) {
 		}
 		toolOutput, err = tool.WikipediaSearch(params.Query)
 	default:
-		return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
+		// Check if it's a generated script tool
+		if scriptPath, ok := scriptMap[toolCall.Function.Name]; ok {
+			var params struct {
+				Args []string `json:"args"`
+			}
+			// Arguments might be optional or empty
+			if toolCall.Function.Arguments != "" {
+				if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
+					return "", fmt.Errorf("failed to unmarshal script arguments: %w", err)
+				}
+			}
+
+			// Determine if python or shell based on extension
+			if strings.HasSuffix(scriptPath, ".py") {
+				toolOutput, err = tool.RunPythonScript(scriptPath, params.Args)
+			} else {
+				toolOutput, err = tool.RunShellScript(scriptPath, params.Args)
+			}
+		} else {
+			return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
+		}
 	}
 
 	if err != nil {
@@ -337,7 +231,7 @@ func executeToolCall(toolCall openai.ToolCall) (string, error) {
 }
 
 // executeSkillWithTools executes a skill, handling potential tool calls in a loop.
-func executeSkillWithTools(ctx context.Context, client *openai.Client, userPrompt string, skill goskills.SkillPackage) error {
+func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *config.Config, userPrompt string, skill goskills.SkillPackage) error {
 	// Reconstruct the skill body from structured parts for the system prompt
 	var skillBody strings.Builder
 	skillBody.WriteString(skill.Body) // Directly use the raw markdown body
@@ -353,11 +247,11 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, userPromp
 		},
 	}
 
-	availableTools := getToolDefinitions()
+	availableTools, scriptMap := goskills.GenerateToolDefinitions(skill)
 
 	for {
 		req := openai.ChatCompletionRequest{
-			Model:    modelName, // Use configurable model name
+			Model:    cfg.Model, // Use configurable model name
 			Messages: messages,
 			Tools:    availableTools,
 			Stream:   true, // Stream only the final text response
@@ -418,7 +312,45 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, userPromp
 			fmt.Println("\n--- LLM requested tool calls ---")
 			for _, tc := range toolCalls {
 				fmt.Printf("⚙️ Calling tool: %s with args: %s\n", tc.Function.Name, tc.Function.Arguments)
-				toolOutput, err := executeToolCall(tc)
+
+				// --- SECURITY CHECK ---
+				// 1. Allowlist Check
+				if len(cfg.AllowedScripts) > 0 {
+					allowed := false
+					for _, script := range cfg.AllowedScripts {
+						if script == tc.Function.Name {
+							allowed = true
+							break
+						}
+					}
+					if !allowed {
+						fmt.Printf("❌ Tool execution denied: '%s' is not in the allowlist.\n", tc.Function.Name)
+						messages = append(messages, openai.ChatCompletionMessage{
+							Role:       openai.ChatMessageRoleTool,
+							ToolCallID: tc.ID,
+							Content:    fmt.Sprintf("Error: Tool '%s' is not allowed by configuration.", tc.Function.Name),
+						})
+						continue
+					}
+				}
+
+				// 2. Confirmation Prompt
+				if !cfg.AutoApproveTools {
+					fmt.Print("⚠️  Allow this tool execution? [y/N]: ")
+					var input string
+					fmt.Scanln(&input)
+					if strings.ToLower(input) != "y" {
+						fmt.Println("❌ Tool execution denied by user.")
+						messages = append(messages, openai.ChatCompletionMessage{
+							Role:       openai.ChatMessageRoleTool,
+							ToolCallID: tc.ID,
+							Content:    "Error: User denied tool execution.",
+						})
+						continue
+					}
+				}
+
+				toolOutput, err := executeToolCall(tc, scriptMap)
 				if err != nil {
 					fmt.Printf("❌ Tool call failed: %v\n", err)
 					// Add error message to history and let LLM try to recover
@@ -452,6 +384,5 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, userPromp
 
 func init() {
 	rootCmd.AddCommand(runCmd)
-	runCmd.Flags().StringVarP(&modelName, "model", "m", "gpt-4o", "OpenAI-compatible model name to use")
-	runCmd.Flags().StringVarP(&apiBase, "api-base", "b", "", "OpenAI-compatible API base URL (e.g., https://api.openai.com/v1)")
+	config.SetupFlags(runCmd)
 }
