@@ -249,18 +249,6 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 
 	availableTools, scriptMap := goskills.GenerateToolDefinitions(skill)
 
-	// Ensure default tools from goskills/tool are always available
-	baseTools := tool.GetBaseTools()
-	existingTools := make(map[string]bool)
-	for _, t := range availableTools {
-		existingTools[t.Function.Name] = true
-	}
-	for _, t := range baseTools {
-		if !existingTools[t.Function.Name] {
-			availableTools = append(availableTools, t)
-		}
-	}
-
 	for {
 		req := openai.ChatCompletionRequest{
 			Model:    cfg.Model, // Use configurable model name
