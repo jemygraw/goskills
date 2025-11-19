@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -141,7 +143,7 @@ func selectSkill(ctx context.Context, client *openai.Client, cfg *config.Config,
 }
 
 // executeToolCall executes a single tool call and returns its output.
-func executeToolCall(toolCall openai.ToolCall, scriptMap map[string]string) (string, error) {
+func executeToolCall(toolCall openai.ToolCall, scriptMap map[string]string, skillPath string) (string, error) {
 	var toolOutput string
 	var err error
 
@@ -171,7 +173,18 @@ func executeToolCall(toolCall openai.ToolCall, scriptMap map[string]string) (str
 		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
 			return "", fmt.Errorf("failed to unmarshal read_file arguments: %w", err)
 		}
-		toolOutput, err = tool.ReadFile(params.FilePath)
+
+		// Resolve path relative to skill directory if it's not absolute and skillPath is provided
+		path := params.FilePath
+		if !filepath.IsAbs(path) && skillPath != "" {
+			resolvedPath := filepath.Join(skillPath, path)
+			// Check if file exists at resolved path
+			if _, err := os.Stat(resolvedPath); err == nil {
+				path = resolvedPath
+			}
+		}
+
+		toolOutput, err = tool.ReadFile(path)
 	case "write_file":
 		var params struct {
 			FilePath string `json:"filePath"`
@@ -235,6 +248,37 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 	// Reconstruct the skill body from structured parts for the system prompt
 	var skillBody strings.Builder
 	skillBody.WriteString(skill.Body) // Directly use the raw markdown body
+	skillBody.WriteString("\n\n")
+
+	// --- INJECT SKILL CONTEXT ---
+	skillBody.WriteString("## SKILL CONTEXT\n")
+	skillBody.WriteString(fmt.Sprintf("Skill Root Path: %s\n", skill.Path))
+	skillBody.WriteString("Available Resources:\n")
+	if len(skill.Resources.Scripts) > 0 {
+		skillBody.WriteString("- Scripts:\n")
+		for _, s := range skill.Resources.Scripts {
+			skillBody.WriteString(fmt.Sprintf("  - %s\n", s))
+		}
+	}
+	if len(skill.Resources.Templates) > 0 {
+		skillBody.WriteString("- Templates:\n")
+		for _, t := range skill.Resources.Templates {
+			skillBody.WriteString(fmt.Sprintf("  - %s\n", t))
+		}
+	}
+	if len(skill.Resources.References) > 0 {
+		skillBody.WriteString("- References:\n")
+		for _, r := range skill.Resources.References {
+			skillBody.WriteString(fmt.Sprintf("  - %s\n", r))
+		}
+	}
+	if len(skill.Resources.Assets) > 0 {
+		skillBody.WriteString("- Assets:\n")
+		for _, a := range skill.Resources.Assets {
+			skillBody.WriteString(fmt.Sprintf("  - %s\n", a))
+		}
+	}
+	skillBody.WriteString("\nIMPORTANT: When reading resource files mentioned in the skill definition, you must use the full path or a path relative to the Skill Root Path.\n")
 
 	messages := []openai.ChatCompletionMessage{
 		{
@@ -248,6 +292,13 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 	}
 
 	availableTools, scriptMap := goskills.GenerateToolDefinitions(skill)
+
+	// --- DEBUG: Print Available Tools ---
+	fmt.Println("🛠️  Available Tools:")
+	for _, t := range availableTools {
+		fmt.Printf("  - %s\n", t.Function.Name)
+	}
+	fmt.Println(strings.Repeat("-", 40))
 
 	for {
 		req := openai.ChatCompletionRequest{
@@ -300,16 +351,24 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 			}
 		}
 
-		// If there's a text response, print it and we're done
+		// Print text response if any
 		if fullResponseContent.Len() > 0 {
 			fmt.Print(fullResponseContent.String())
 			fmt.Println()
-			return nil
 		}
 
 		// If there are tool calls, execute them
 		if len(toolCalls) > 0 {
 			fmt.Println("\n--- LLM requested tool calls ---")
+
+			// Append the assistant's message (with text and tool calls) to history
+			assistantMsg := openai.ChatCompletionMessage{
+				Role:      openai.ChatMessageRoleAssistant,
+				Content:   fullResponseContent.String(),
+				ToolCalls: toolCalls,
+			}
+			messages = append(messages, assistantMsg)
+
 			for _, tc := range toolCalls {
 				fmt.Printf("⚙️ Calling tool: %s with args: %s\n", tc.Function.Name, tc.Function.Arguments)
 
@@ -350,7 +409,7 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 					}
 				}
 
-				toolOutput, err := executeToolCall(tc, scriptMap)
+				toolOutput, err := executeToolCall(tc, scriptMap, skill.Path)
 				if err != nil {
 					fmt.Printf("❌ Tool call failed: %v\n", err)
 					// Add error message to history and let LLM try to recover
@@ -361,11 +420,7 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 					})
 				} else {
 					fmt.Printf("✅ Tool output: %s\n", toolOutput)
-					// Add tool call and output to history
-					messages = append(messages, openai.ChatCompletionMessage{
-						Role:      openai.ChatMessageRoleAssistant,
-						ToolCalls: []openai.ToolCall{tc}, // Add the tool call made by the assistant
-					})
+					// Add tool output to history
 					messages = append(messages, openai.ChatCompletionMessage{
 						Role:       openai.ChatMessageRoleTool,
 						ToolCallID: tc.ID,
@@ -376,6 +431,10 @@ func executeSkillWithTools(ctx context.Context, client *openai.Client, cfg *conf
 			fmt.Println("--- Continuing LLM conversation ---")
 			// Loop again to let LLM process tool output
 		} else {
+			// If no tool calls and we have text, we are done
+			if fullResponseContent.Len() > 0 {
+				return nil
+			}
 			// Should not happen if fullResponseContent is empty and no tool calls
 			return errors.New("LLM response was empty and contained no tool calls")
 		}

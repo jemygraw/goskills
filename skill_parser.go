@@ -35,6 +35,7 @@ type SkillResources struct {
 	Scripts    []string `json:"scripts"`
 	References []string `json:"references"`
 	Assets     []string `json:"assets"`
+	Templates  []string `json:"templates"`
 }
 
 // extractFrontmatterAndBody separates and parses the frontmatter and body of SKILL.md
@@ -128,6 +129,10 @@ func ParseSkillPackage(dirPath string) (*SkillPackage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error scanning 'assets' directory: %w", err)
 	}
+	templates, err := findResourceFiles(dirPath, "templates")
+	if err != nil {
+		return nil, fmt.Errorf("error scanning 'templates' directory: %w", err)
+	}
 
 	// 3. Assemble SkillPackage
 	pkg := &SkillPackage{
@@ -138,6 +143,7 @@ func ParseSkillPackage(dirPath string) (*SkillPackage, error) {
 			Scripts:    scripts,
 			References: references,
 			Assets:     assets,
+			Templates:  templates,
 		},
 	}
 
