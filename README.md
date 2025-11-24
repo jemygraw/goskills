@@ -171,3 +171,20 @@ To run the tests for this package, navigate to the project root directory and ru
 ```shell
 go test
 ```
+
+## Installation
+
+```
+brew install smallnest/goskills/goskills
+```
+
+or
+
+```
+# add tap
+brew tap smallnest/goskills
+
+# install goskills
+brew install goskills
+
+```
