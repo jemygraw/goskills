@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - GoSkills</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-cube"></i>
+                <span>GoSkills</span>
+            </a>
+            <nav class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="documentation.html" class="active">Documentation</a>
+                <a href="usage.html">Integration</a>
+                <a href="examples.html">Examples</a>
+                <a href="https://github.com/smallnest/goskills" target="_blank"><i class="fa-brands fa-github"></i>
+                    GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="docs-container">
+        <aside class="docs-sidebar">
+            <ul>
+                <li><a href="#introduction" class="active">Introduction</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#library-usage">Library Usage</a></li>
+                <li><a href="#cli-tools">CLI Tools</a></li>
+                <li><a href="#skill-runner">Skill Runner</a></li>
+                <li><a href="#mcp-support">MCP Support</a></li>
+            </ul>
+        </aside>
+
+        <main class="docs-content">
+            <h1 id="introduction">Introduction</h1>
+            <p>GoSkills is a Go package designed to parse and run Claude Skill packages. It adheres to the
+                specifications found in the official Claude documentation, allowing you to build intelligent agents that
+                can utilize a wide range of skills.</p>
+
+            <h2 id="installation">Installation</h2>
+            <p>To use GoSkills in your project, you can install it via <code>go get</code>:</p>
+            <pre><code>go get github.com/smallnest/goskills</code></pre>
+
+            <p>You can also install the CLI tools using Homebrew:</p>
+            <pre><code>brew tap smallnest/goskills
+brew install goskills</code></pre>
+
+            <h2 id="library-usage">Library Usage</h2>
+            <p>Here is a simple example of how to parse a skill package:</p>
+            <pre><code>package main
+
+import (
+    "fmt"
+    "log"
+    "github.com/smallnest/goskills"
+)
+
+func main() {
+    skillDirectory := "./examples/skills/artifacts-builder"
+    skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
+    if err != nil {
+        log.Fatalf("Failed to parse skill package: %v", err)
+    }
+    fmt.Printf("Successfully Parsed Skill: %s\n", skillPackage.Meta.Name)
+}</code></pre>
+
+            <h2 id="cli-tools">CLI Tools</h2>
+            <p>GoSkills provides two main command-line interfaces:</p>
+
+            <h3>Skill Management CLI (goskills-cli)</h3>
+            <p>Inspect and manage your local skills.</p>
+            <pre><code># List skills
+./goskills-cli list ./examples/skills
+
+# Parse a specific skill
+./goskills-cli parse ./examples/skills/artifacts-builder</code></pre>
+
+            <h2 id="skill-runner">Skill Runner</h2>
+            <p>The runner simulates the Claude skill-use workflow. It requires an OpenAI-compatible API key.</p>
+            <pre><code>export OPENAI_API_KEY="YOUR_KEY"
+./goskills run "create an algorithm that generates abstract art"</code></pre>
+
+            <h3 id="custom-models">Custom Models</h3>
+            <p>You can use other models like DeepSeek or Qianfan by specifying the API base and model name:</p>
+            <pre><code>./goskills run \
+  --model deepseek-v3 \
+  --api-base https://api.deepseek.com/v1 \
+  "your prompt here"</code></pre>
+
+            <h2 id="mcp-support">MCP Support</h2>
+            <p>GoSkills supports the Model Context Protocol (MCP), allowing you to connect to external tools. You can
+                configure MCP servers via a JSON configuration file.</p>
+            <p>By default, it looks for <code>mcp.json</code> in the current directory or <code>~/.claude.json</code>.
+            </p>
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 GoSkills. Released under the MIT License.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

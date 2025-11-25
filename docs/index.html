@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoSkills - Claude Skills Parser & Runner for Go</title>
+    <meta name="description"
+        content="A powerful Go package to parse and run Claude Skill packages. Integrate LLM capabilities into your Go applications with ease.">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code&display=swap"
+        rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-cube"></i>
+                <span>GoSkills</span>
+            </a>
+            <nav class="nav-links">
+                <a href="index.html" class="active">Home</a>
+                <a href="documentation.html" class="active">Documentation</a>
+                <a href="usage.html">Integration</a>
+                <a href="examples.html">Examples</a>
+                <a href="https://github.com/smallnest/goskills" target="_blank"><i class="fa-brands fa-github"></i>
+                    GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Unlock the Power of <br>Claude Skills with other LLMs</h1>
+            <p>A robust claude parser and agent CLI for Claude Skill packages. Build intelligent agents and integrate
+                LLM capabilities seamlessly into your applications with lots of programming languages support.</p>
+            <div class="cta-buttons">
+                <a href="documentation.html" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/smallnest/goskills" target="_blank" class="btn btn-secondary">View on
+                    GitHub</a>
+            </div>
+        </section>
+
+        <div style="max-width: 800px; margin: 0 auto 60px; padding: 0 20px;">
+            <div class="feature-card" style="text-align: left;">
+                <pre
+                    style="margin: 0;"><code>export OPENAI_API_KEY=your_open_ai_key
+export OPENAI_API_BASE=https://api.openai.com/v1
+export OPENAI_MODEL=gpt-5.1
+./goskills run --auto-approve "use markitdown to parse https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584"</code></pre>
+            </div>
+        </div>
+
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-code"></i></div>
+                <h3>Skill Parser</h3>
+                <p>Parse `SKILL.md` files effortlessly. Extract metadata, instructions, and resource files according to
+                    official Claude specifications.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-robot"></i></div>
+                <h3>LLM Runner</h3>
+                <p>Simulate the Claude skill-use workflow. Integrate with OpenAI-compatible models (GPT-4, DeepSeek,
+                    etc.) to execute skills intelligently.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-puzzle-piece"></i></div>
+                <h3>Claude Skills Support</h3>
+                <p>Seamlessly integrate standard Claude Skills. Use the official format to define tools, prompts, and
+                    resources for your agents.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-network-wired"></i></div>
+                <h3>MCP Support</h3>
+                <p>Built-in support for the Model Context Protocol. Connect to external tools and data sources with
+                    standard configuration.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-terminal"></i></div>
+                <h3>Powerful CLI</h3>
+                <p>Manage and run skills directly from the terminal. Inspect skill structures, search for capabilities,
+                    and execute tasks with a single command.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-layer-group"></i></div>
+                <h3>Modular Design</h3>
+                <p>Packaged as a reusable Go module. Easily import into your existing projects to add agentic
+                    capabilities.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon"><i class="fa-solid fa-bolt"></i></div>
+                <h3>High Performance</h3>
+                <p>Built with Go for speed and efficiency. Handle complex skill parsing and execution with minimal
+                    overhead.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 GoSkills. Released under the MIT License.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>
