@@ -1,6 +1,7 @@
 package goskills
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,8 +16,8 @@ import (
 
 // Agent manages the skill discovery, selection, and execution process.
 type Agent struct {
-	client *openai.Client
-	cfg    RunnerConfig
+	client   *openai.Client
+	cfg      RunnerConfig
 	messages []openai.ChatCompletionMessage // Stores the conversation history
 }
 
@@ -29,6 +30,7 @@ type RunnerConfig struct {
 	Verbose          bool
 	AutoApproveTools bool
 	AllowedScripts   []string
+	Loop             bool
 }
 
 // NewAgent creates and initializes a new Agent.
@@ -42,29 +44,88 @@ func NewAgent(cfg RunnerConfig) (*Agent, error) {
 
 	openaiConfig := openai.DefaultConfig(cfg.APIKey)
 	if cfg.APIBase != "" {
-	openaiConfig.BaseURL = cfg.APIBase
+		openaiConfig.BaseURL = cfg.APIBase
 	}
 	client := openai.NewClientWithConfig(openaiConfig)
 
 	return &Agent{
-		client: client,
-		cfg:    cfg,
+		client:   client,
+		cfg:      cfg,
 		messages: []openai.ChatCompletionMessage{}, // Initialize empty message history
 	}, nil
 }
 
-// Run executes the main skill selection and execution logic.
+// Run executes the main skill selection and execution logic for a single turn.
 func (a *Agent) Run(ctx context.Context, userPrompt string) (string, error) {
+	selectedSkill, err := a.selectAndPrepareSkill(ctx, userPrompt)
+	if err != nil {
+		return "", err
+	}
+
+	// --- STEP 3: SKILL EXECUTION (with Tool Calling) ---
+	if a.cfg.Verbose {
+		fmt.Println("🚀 Executing skill (with potential tool calls).")
+		fmt.Println(strings.Repeat("-", 40))
+	}
+
+	return a.executeSkillWithTools(ctx, userPrompt, *selectedSkill)
+}
+
+// RunLoop starts an interactive session for a selected skill.
+func (a *Agent) RunLoop(ctx context.Context, initialPrompt string) error {
+	selectedSkill, err := a.selectAndPrepareSkill(ctx, initialPrompt)
+	if err != nil {
+		return err
+	}
+
+	// Prepare the system message once
+	var skillBody strings.Builder
+	skillBody.WriteString(selectedSkill.Body)
+	skillBody.WriteString("\n\n## SKILL CONTEXT\n")
+	skillBody.WriteString(fmt.Sprintf("Skill Root Path: %s\n", selectedSkill.Path))
+	a.messages = append(a.messages, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleSystem,
+		Content: skillBody.String(),
+	})
+
+	reader := bufio.NewReader(os.Stdin)
+	currentPrompt := initialPrompt
+
+	for {
+		fmt.Println(strings.Repeat("-", 40))
+		finalOutput, err := a.continueSkillWithTools(ctx, currentPrompt, *selectedSkill)
+		if err != nil {
+			fmt.Printf("❌ Error during execution: %v\n", err)
+		} else {
+			fmt.Println("✅ Final Output:")
+			fmt.Println(finalOutput)
+		}
+
+		fmt.Print("\nContinue in loop? (y/N): ")
+		answer, _ := reader.ReadString('\n')
+		if strings.TrimSpace(strings.ToLower(answer)) != "y" {
+			break
+		}
+
+		fmt.Print("Next prompt: ")
+		currentPrompt, _ = reader.ReadString('\n')
+		currentPrompt = strings.TrimSpace(currentPrompt)
+	}
+	return nil
+}
+
+// selectAndPrepareSkill discovers and selects the appropriate skill.
+func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*SkillPackage, error) {
 	// --- STEP 1: SKILL DISCOVERY ---
 	if a.cfg.Verbose {
 		fmt.Printf("🔎 Discovering available skills in %s...\n", a.cfg.SkillsDir)
 	}
 	availableSkills, err := a.discoverSkills(a.cfg.SkillsDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to discover skills: %w", err)
+		return nil, fmt.Errorf("failed to discover skills: %w", err)
 	}
 	if len(availableSkills) == 0 {
-		return "", errors.New("no valid skills found")
+		return nil, errors.New("no valid skills found")
 	}
 	if a.cfg.Verbose {
 		fmt.Printf("✅ Found %d skills.\n\n", len(availableSkills))
@@ -76,29 +137,17 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (string, error) {
 	}
 	selectedSkillName, err := a.selectSkill(ctx, userPrompt, availableSkills)
 	if err != nil {
-		return "", fmt.Errorf("failed during skill selection: %w", err)
+		return nil, fmt.Errorf("failed during skill selection: %w", err)
 	}
 
 	selectedSkill, ok := availableSkills[selectedSkillName]
 	if !ok {
-		return "", fmt.Errorf("⚠️ LLM selected a non-existent skill '%s'. Aborting", selectedSkillName)
+		return nil, fmt.Errorf("⚠️ LLM selected a non-existent skill '%s'. Aborting", selectedSkillName)
 	}
 	if a.cfg.Verbose {
 		fmt.Printf("✅ LLM selected skill: %s\n\n", selectedSkillName)
 	}
-
-	// --- STEP 3: SKILL EXECUTION (with Tool Calling) ---
-	if a.cfg.Verbose {
-		fmt.Println("🚀 Executing skill (with potential tool calls).")
-		fmt.Println(strings.Repeat("-", 40))
-	}
-
-	finalOutput, err := a.executeSkillWithTools(ctx, userPrompt, selectedSkill)
-	if err != nil {
-		return "", fmt.Errorf("failed during skill execution: %w", err)
-	}
-
-	return finalOutput, nil
+	return &selectedSkill, nil
 }
 
 func (a *Agent) discoverSkills(skillsRoot string) (map[string]SkillPackage, error) {
@@ -126,18 +175,21 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	}
 	sb.WriteString("\nBased on the user request, which single skill is the most appropriate to use? Respond with only the name of the skill.")
 
-	req := openai.ChatCompletionRequest{
-		Model: a.cfg.Model,
-		Messages: []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: "You are an expert assistant that selects the most appropriate skill to handle a user's request. Your response must be only the exact name of the chosen skill, with no other text or explanation.",
-			},
-			{
-				Role:    openai.ChatMessageRoleUser,
-				Content: sb.String(),
-			},
+	// Use a temporary message history for skill selection
+	selectionMessages := []openai.ChatCompletionMessage{
+		{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: "You are an expert assistant that selects the most appropriate skill to handle a user's request. Your response must be only the exact name of the chosen skill, with no other text or explanation.",
 		},
+		{
+			Role:    openai.ChatMessageRoleUser,
+			Content: sb.String(),
+		},
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model:       a.cfg.Model,
+		Messages:    selectionMessages,
 		Temperature: 0,
 	}
 
@@ -152,18 +204,23 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	return skillName, nil
 }
 
+// executeSkillWithTools sets up the initial system prompt and starts the tool-use conversation.
 func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, skill SkillPackage) (string, error) {
+	// Prepare the system message once
 	var skillBody strings.Builder
 	skillBody.WriteString(skill.Body)
 	skillBody.WriteString("\n\n## SKILL CONTEXT\n")
 	skillBody.WriteString(fmt.Sprintf("Skill Root Path: %s\n", skill.Path))
-	// ... (rest of skill context)
-
-	// Initialize messages with system and user prompts
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleSystem,
 		Content: skillBody.String(),
 	})
+
+	return a.continueSkillWithTools(ctx, userPrompt, skill)
+}
+
+// continueSkillWithTools continues a conversation with a new user prompt.
+func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, skill SkillPackage) (string, error) {
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: userPrompt,
@@ -185,30 +242,28 @@ func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, sk
 		}
 
 		msg := resp.Choices[0].Message
-		a.messages = append(a.messages, msg) // Append LLM's response to agent's messages
+		a.messages = append(a.messages, msg) // Append LLM's response
 
 		if msg.ToolCalls == nil {
 			finalResponse.WriteString(msg.Content)
 			return finalResponse.String(), nil
 		}
 
-		// Parallel execution of tool calls could be implemented here
 		for _, tc := range msg.ToolCalls {
 			if a.cfg.Verbose {
 				fmt.Printf("⚙️ Calling tool: %s with args: %s\n", tc.Function.Name, tc.Function.Arguments)
 			}
 
-			// --- SECURITY CHECK ---
 			if !a.cfg.AutoApproveTools {
 				fmt.Print("⚠️  Allow this tool execution? [y/N]: ")
 				var input string
 				fmt.Scanln(&input)
-				if strings.ToLower(input) != "y" {
+				if strings.ToLower(strings.TrimSpace(input)) != "y" {
 					fmt.Println("❌ Tool execution denied by user.")
-				a.messages = append(a.messages, openai.ChatCompletionMessage{ // Append to agent's messages
+					a.messages = append(a.messages, openai.ChatCompletionMessage{
 						Role:       openai.ChatMessageRoleTool,
-							ToolCallID: tc.ID,
-							Content:    "Error: User denied tool execution.",
+						ToolCallID: tc.ID,
+						Content:    "Error: User denied tool execution.",
 					})
 					continue
 				}
@@ -217,17 +272,17 @@ func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, sk
 			toolOutput, err := a.executeToolCall(tc, scriptMap, skill.Path)
 			if err != nil {
 				fmt.Printf("❌ Tool call failed: %v\n", err)
-				a.messages = append(a.messages, openai.ChatCompletionMessage{ // Append to agent's messages
-						Role:       openai.ChatMessageRoleTool,
-							ToolCallID: tc.ID,
-							Content:    fmt.Sprintf("Error: %v", err),
-					})
+				a.messages = append(a.messages, openai.ChatCompletionMessage{
+					Role:       openai.ChatMessageRoleTool,
+					ToolCallID: tc.ID,
+					Content:    fmt.Sprintf("Error: %v", err),
+				})
 			} else {
-				a.messages = append(a.messages, openai.ChatCompletionMessage{ // Append to agent's messages
-						Role:       openai.ChatMessageRoleTool,
-							ToolCallID: tc.ID,
-							Content:    toolOutput,
-					})
+				a.messages = append(a.messages, openai.ChatCompletionMessage{
+					Role:       openai.ChatMessageRoleTool,
+					ToolCallID: tc.ID,
+					Content:    toolOutput,
+				})
 			}
 		}
 	}

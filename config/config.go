@@ -17,6 +17,7 @@ type Config struct {
 	AutoApproveTools bool
 	AllowedScripts   []string
 	Verbose          bool
+	Loop             bool
 }
 
 // LoadConfig loads configuration from flags and environment variables
@@ -46,6 +47,10 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Verbose, err = cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return nil, err
+	}
+	cfg.Loop, err = cmd.Flags().GetBool("loop")
 	if err != nil {
 		return nil, err
 	}
@@ -92,4 +97,5 @@ func SetupFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("auto-approve", false, "Auto-approve all tool calls (WARNING: potentially unsafe)")
 	cmd.Flags().StringSlice("allow-scripts", nil, "Comma-separated list of allowed script names (e.g. 'run_myscript_py')")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
+	cmd.Flags().BoolP("loop", "l", false, "Enable interactive loop mode")
 }

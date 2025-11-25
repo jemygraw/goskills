@@ -51,6 +51,7 @@ You can specify a custom model and API base URL using flags.`,
 			Verbose:          cfg.Verbose,
 			AutoApproveTools: cfg.AutoApproveTools,
 			AllowedScripts:   cfg.AllowedScripts,
+			Loop:             cfg.Loop,
 		}
 
 		agent, err := goskills.NewAgent(runnerCfg)
@@ -59,6 +60,11 @@ You can specify a custom model and API base URL using flags.`,
 		}
 
 		ctx := context.Background()
+
+		if runnerCfg.Loop {
+			return agent.RunLoop(ctx, userPrompt)
+		}
+
 		result, err := agent.Run(ctx, userPrompt)
 		if err != nil {
 			return err
