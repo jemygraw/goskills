@@ -167,6 +167,35 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./examples/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
 
+### 3. Deep Research Agent CLI (`agent-cli`)
+
+Located in `cmd/agent-cli`, this is a powerful, pure Go implementation of a Deep Research Agent. It does not rely on any third-party agent frameworks (like LangChain), offering a lightweight and transparent "Planner-Executor-SubAgents" architecture.
+
+#### Features
+- **Autonomous Planning**: Decomposes user requests into search, analysis, and reporting tasks.
+- **Deep Search**: Integrates with Tavily for real-time internet search.
+- **Intelligent Analysis**: Synthesizes information from multiple sources.
+- **TUI Interface**: A beautiful, terminal-based user interface built with `bubbletea`.
+
+#### Building `agent-cli`
+```shell
+go build -o agent-cli ./cmd/agent-cli
+```
+
+#### Usage
+Set your environment variables:
+```shell
+export OPENAI_API_KEY="YOUR_KEY"
+export TAVILY_API_KEY="YOUR_TAVILY_KEY"
+```
+
+Run the agent:
+```shell
+./agent-cli
+```
+
+For a detailed introduction and implementation principles, please refer to [agent.md](agent.md).
+
 ## Running Tests
 
 To run the tests for this package, navigate to the project root directory and run:
