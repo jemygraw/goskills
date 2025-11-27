@@ -35,5 +35,7 @@ goskills-cli
 goskills
 agent-cli
 !agent-cli/
+agent-web
+!agent-web/
 # Added by goreleaser init:
 dist/
