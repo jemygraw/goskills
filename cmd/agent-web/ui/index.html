@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoSkills Agent</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>GoSkills Agent</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="panel left-panel">
+                <div class="panel-header">
+                    <i class="fas fa-compass"></i> RESEARCH PLAN
+                </div>
+                <div id="plan-container">
+                    <div class="empty-state">No active plan</div>
+                </div>
+            </div>
+
+            <div class="panel right-panel">
+                <div class="window-header">
+                    <div class="window-controls">
+                        <span class="control red"></span>
+                        <span class="control yellow"></span>
+                        <span class="control green"></span>
+                    </div>
+                    <div class="window-tabs">
+                        <div class="tab active" data-tab="terminal">Terminal</div>
+                    </div>
+                </div>
+                <div id="terminal-container" class="tab-content active">
+                    <div class="log-line system">> Initializing agent...</div>
+                    <div class="log-line system">> Initialized agent</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="input-area">
+            <form id="chat-form">
+                <textarea id="user-input" placeholder="Type your request here..." rows="1" required></textarea>
+                <button type="submit" id="send-btn"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Templates -->
+    <template id="plan-item-template">
+        <div class="plan-item pending">
+            <div class="status-icon"><i class="far fa-circle"></i></div>
+            <div class="task-details">
+                <div class="task-desc"></div>
+                <div class="task-meta"></div>
+            </div>
+        </div>
+    </template>
+
+    <template id="plan-review-modal-template">
+        <div class="modal-overlay">
+            <div class="modal">
+                <h3>Review Plan</h3>
+                <div class="plan-preview"></div>
+                <div class="modal-actions">
+                    <button class="approve-btn">Approve</button>
+                    <button class="modify-btn">Modify</button>
+                </div>
+                <div class="modification-input" style="display: none;">
+                    <textarea placeholder="Enter your modifications..."></textarea>
+                    <button class="submit-mod-btn">Submit</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

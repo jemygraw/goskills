@@ -20,10 +20,11 @@ type PlanningAgent struct {
 
 // AgentConfig holds the configuration for the planning agent.
 type AgentConfig struct {
-	APIKey  string
-	APIBase string
-	Model   string
-	Verbose bool
+	APIKey     string
+	APIBase    string
+	Model      string
+	Verbose    bool
+	RenderHTML bool
 }
 
 // NewPlanningAgent creates and initializes a new PlanningAgent.
@@ -51,9 +52,9 @@ func NewPlanningAgent(config AgentConfig, interactionHandler InteractionHandler)
 
 	// Initialize subagents
 	agent.subagents[TaskTypeSearch] = NewSearchSubagent(client, config.Model, config.Verbose, interactionHandler)
-	agent.subagents[TaskTypeAnalyze] = NewAnalysisSubagent(client, config.Model, config.Verbose)
-	agent.subagents[TaskTypeReport] = NewReportSubagent(client, config.Model, config.Verbose)
-	agent.subagents[TaskTypeRender] = NewRenderSubagent(config.Verbose)
+	agent.subagents[TaskTypeAnalyze] = NewAnalysisSubagent(client, config.Model, config.Verbose, interactionHandler)
+	agent.subagents[TaskTypeReport] = NewReportSubagent(client, config.Model, config.Verbose, interactionHandler)
+	agent.subagents[TaskTypeRender] = NewRenderSubagent(config.Verbose, config.RenderHTML, interactionHandler)
 	agent.subagents[TaskTypePodcast] = NewPodcastSubagent(client, config.Model, config.Verbose)
 
 	return agent, nil
@@ -87,16 +88,28 @@ Return ONLY a valid JSON object with this structure:
 
 Keep plans simple and focused. Typically 2-4 tasks are sufficient.`
 
+	// Inject global context from history
+	var globalContextBuilder strings.Builder
+	for _, msg := range a.messages {
+		if msg.Role == openai.ChatMessageRoleDeveloper {
+			globalContextBuilder.WriteString(fmt.Sprintf("User: %s\n", msg.Content))
+		}
+	}
+	if globalContextBuilder.Len() > 0 {
+		systemPrompt += "\n\nIMPORTANT CONTEXT/INSTRUCTIONS FROM USER:\n" + globalContextBuilder.String()
+	}
+
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
 			Content: systemPrompt,
 		},
-		{
-			Role:    openai.ChatMessageRoleUser,
-			Content: fmt.Sprintf("Create a plan for this request: %s", userRequest),
-		},
 	}
+
+	messages = append(messages, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleUser,
+		Content: fmt.Sprintf("Create a plan for this request: %s", userRequest),
+	})
 
 	req := openai.ChatCompletionRequest{
 		Model:       a.config.Model,
@@ -200,6 +213,21 @@ func (a *PlanningAgent) Execute(ctx context.Context, plan *Plan) ([]Result, erro
 		if a.config.Verbose {
 			fmt.Printf("📍 Step %d/%d: [%s] %s\n", i+1, len(plan.Tasks), task.Type, task.Description)
 		}
+		if a.interactionHandler != nil {
+			a.interactionHandler.Log(fmt.Sprintf("📍 Step %d/%d: [%s] %s", i+1, len(plan.Tasks), task.Type, task.Description))
+		}
+
+		// Inject global context from history
+		if task.Parameters == nil {
+			task.Parameters = make(map[string]interface{})
+		}
+		var globalContextBuilder strings.Builder
+		for _, msg := range a.messages {
+			if msg.Role == openai.ChatMessageRoleUser {
+				globalContextBuilder.WriteString(fmt.Sprintf("User: %s\n", msg.Content))
+			}
+		}
+		task.Parameters["global_context"] = globalContextBuilder.String()
 
 		// Inject context from previous tasks
 		if len(contextData) > 0 {
@@ -233,9 +261,15 @@ func (a *PlanningAgent) Execute(ctx context.Context, plan *Plan) ([]Result, erro
 			if a.config.Verbose {
 				fmt.Printf("  ✓ Completed\n\n")
 			}
+			if a.interactionHandler != nil {
+				a.interactionHandler.Log("  ✓ Completed")
+			}
 		} else {
 			if a.config.Verbose {
 				fmt.Printf("  ✗ Failed: %s\n\n", result.Error)
+			}
+			if a.interactionHandler != nil {
+				a.interactionHandler.Log(fmt.Sprintf("  ✗ Failed: %s", result.Error))
 			}
 		}
 	}
@@ -309,6 +343,14 @@ func (a *PlanningAgent) AddUserMessage(content string) {
 	})
 }
 
+// AddDeveloperMessage adds a developer message to the conversation history.
+func (a *PlanningAgent) AddDeveloperMessage(content string) {
+	a.messages = append(a.messages, openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleDeveloper,
+		Content: content,
+	})
+}
+
 // AddAssistantMessage adds an assistant message to the conversation history.
 func (a *PlanningAgent) AddAssistantMessage(content string) {
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
@@ -320,4 +362,46 @@ func (a *PlanningAgent) AddAssistantMessage(content string) {
 // ClearHistory clears the conversation history.
 func (a *PlanningAgent) ClearHistory() {
 	a.messages = []openai.ChatCompletionMessage{}
+}
+
+// Chat performs a simple chat interaction without planning.
+func (a *PlanningAgent) Chat(ctx context.Context, userRequest string) (string, error) {
+	// Add user message
+	a.AddUserMessage(userRequest)
+
+	// Inject global context from history
+	var globalContextBuilder strings.Builder
+	for _, msg := range a.messages {
+		if msg.Role == openai.ChatMessageRoleUser {
+			globalContextBuilder.WriteString(fmt.Sprintf("User: %s\n", msg.Content))
+		}
+	}
+
+	systemPrompt := "You are a helpful assistant."
+	if globalContextBuilder.Len() > 0 {
+		systemPrompt += "\n\nIMPORTANT CONTEXT/INSTRUCTIONS FROM USER:\n" + globalContextBuilder.String()
+	}
+
+	messages := []openai.ChatCompletionMessage{
+		{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: systemPrompt,
+		},
+	}
+	messages = append(messages, a.messages...)
+
+	req := openai.ChatCompletionRequest{
+		Model:    a.config.Model,
+		Messages: messages,
+	}
+
+	resp, err := a.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	content := resp.Choices[0].Message.Content
+	a.AddAssistantMessage(content)
+
+	return content, nil
 }

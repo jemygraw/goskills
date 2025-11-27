@@ -75,6 +75,10 @@ func (h *CLIInteractionHandler) ConfirmPodcastGeneration(report string) (bool, e
 	return strings.EqualFold(input, "y") || strings.EqualFold(input, "yes"), nil
 }
 
+func (h *CLIInteractionHandler) Log(message string) {
+	fmt.Println(message)
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "agent-cli",
 	Short: "A deep agents CLI tool with planning and specialized subagents.",

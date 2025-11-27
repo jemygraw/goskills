@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	markdown "github.com/MichaelMure/go-term-markdown"
-	openai "github.com/sashabaranov/go-openai"
 	"github.com/smallnest/goskills/tool"
+
+	markdown "github.com/MichaelMure/go-term-markdown"
+	gomarkdown "github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	"github.com/gomarkdown/markdown/parser"
+	openai "github.com/sashabaranov/go-openai"
 )
 
 // SearchSubagent performs web searches.
@@ -37,6 +41,9 @@ func (s *SearchSubagent) Type() TaskType {
 func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error) {
 	if s.verbose {
 		fmt.Println("🌐 Web Search Subagent")
+	}
+	if s.interactionHandler != nil {
+		s.interactionHandler.Log(fmt.Sprintf("> Web Search Subagent: %s", task.Description))
 	}
 
 	// Extract query from parameters
@@ -100,6 +107,9 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 	if s.verbose {
 		fmt.Printf("\n  ✓ Retrieved information (%d bytes)\n", len(searchResult))
 	}
+	if s.interactionHandler != nil {
+		s.interactionHandler.Log(fmt.Sprintf("✓ Retrieved information (%d bytes)", len(searchResult)))
+	}
 
 	return Result{
 		TaskType: TaskTypeSearch,
@@ -113,17 +123,19 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 
 // AnalysisSubagent analyzes and synthesizes information.
 type AnalysisSubagent struct {
-	client  *openai.Client
-	model   string
-	verbose bool
+	client             *openai.Client
+	model              string
+	verbose            bool
+	interactionHandler InteractionHandler
 }
 
 // NewAnalysisSubagent creates a new AnalysisSubagent.
-func NewAnalysisSubagent(client *openai.Client, model string, verbose bool) *AnalysisSubagent {
+func NewAnalysisSubagent(client *openai.Client, model string, verbose bool, interactionHandler InteractionHandler) *AnalysisSubagent {
 	return &AnalysisSubagent{
-		client:  client,
-		model:   model,
-		verbose: verbose,
+		client:             client,
+		model:              model,
+		verbose:            verbose,
+		interactionHandler: interactionHandler,
 	}
 }
 
@@ -137,6 +149,9 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 	if a.verbose {
 		fmt.Println("🔬 Analysis Subagent")
 	}
+	if a.interactionHandler != nil {
+		a.interactionHandler.Log(fmt.Sprintf("> Analysis Subagent: %s", task.Description))
+	}
 
 	// Get context from parameters if available
 	contextData, hasContext := task.Parameters["context"].([]string)
@@ -148,10 +163,17 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 		prompt = task.Description
 	}
 
+	// Check for global context
+	globalContext, _ := task.Parameters["global_context"].(string)
+	systemPrompt := "You are an analytical assistant that synthesizes and analyzes information. Provide clear, structured analysis."
+	if globalContext != "" {
+		systemPrompt += "\n\nIMPORTANT CONTEXT/INSTRUCTIONS FROM USER:\n" + globalContext
+	}
+
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: "You are an analytical assistant that synthesizes and analyzes information. Provide clear, structured analysis.",
+			Content: systemPrompt,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
@@ -179,6 +201,9 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 	if a.verbose {
 		fmt.Printf("  ✓ Analysis complete (%d bytes)\n", len(analysis))
 	}
+	if a.interactionHandler != nil {
+		a.interactionHandler.Log(fmt.Sprintf("✓ Analysis complete (%d bytes)", len(analysis)))
+	}
 
 	return Result{
 		TaskType: TaskTypeAnalyze,
@@ -189,17 +214,19 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 
 // ReportSubagent generates formatted reports.
 type ReportSubagent struct {
-	client  *openai.Client
-	model   string
-	verbose bool
+	client             *openai.Client
+	model              string
+	verbose            bool
+	interactionHandler InteractionHandler
 }
 
 // NewReportSubagent creates a new ReportSubagent.
-func NewReportSubagent(client *openai.Client, model string, verbose bool) *ReportSubagent {
+func NewReportSubagent(client *openai.Client, model string, verbose bool, interactionHandler InteractionHandler) *ReportSubagent {
 	return &ReportSubagent{
-		client:  client,
-		model:   model,
-		verbose: verbose,
+		client:             client,
+		model:              model,
+		verbose:            verbose,
+		interactionHandler: interactionHandler,
 	}
 }
 
@@ -213,6 +240,9 @@ func (r *ReportSubagent) Execute(ctx context.Context, task Task) (Result, error)
 	if r.verbose {
 		fmt.Println("📝 Report Subagent")
 	}
+	if r.interactionHandler != nil {
+		r.interactionHandler.Log(fmt.Sprintf("> Report Subagent: %s", task.Description))
+	}
 
 	// Get context from parameters if available
 	contextData, hasContext := task.Parameters["context"].([]string)
@@ -224,10 +254,17 @@ func (r *ReportSubagent) Execute(ctx context.Context, task Task) (Result, error)
 		prompt = task.Description
 	}
 
+	// Check for global context
+	globalContext, _ := task.Parameters["global_context"].(string)
+	systemPrompt := "You are a report writing assistant that creates well-formatted, clear, and comprehensive reports in Markdown format. Use appropriate headings, lists, and formatting to make the report easy to read."
+	if globalContext != "" {
+		systemPrompt += "\n\nIMPORTANT CONTEXT/INSTRUCTIONS FROM USER:\n" + globalContext
+	}
+
 	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: "You are a report writing assistant that creates well-formatted, clear, and comprehensive reports in Markdown format. Use appropriate headings, lists, and formatting to make the report easy to read.",
+			Content: systemPrompt,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
@@ -255,6 +292,9 @@ func (r *ReportSubagent) Execute(ctx context.Context, task Task) (Result, error)
 	if r.verbose {
 		fmt.Printf("  ✓ Report generated (%d bytes)\n", len(report))
 	}
+	if r.interactionHandler != nil {
+		r.interactionHandler.Log(fmt.Sprintf("✓ Report generated (%d bytes)", len(report)))
+	}
 
 	return Result{
 		TaskType: TaskTypeReport,
@@ -265,13 +305,17 @@ func (r *ReportSubagent) Execute(ctx context.Context, task Task) (Result, error)
 
 // RenderSubagent renders markdown to terminal-friendly format.
 type RenderSubagent struct {
-	verbose bool
+	verbose            bool
+	renderHTML         bool
+	interactionHandler InteractionHandler
 }
 
 // NewRenderSubagent creates a new RenderSubagent.
-func NewRenderSubagent(verbose bool) *RenderSubagent {
+func NewRenderSubagent(verbose bool, renderHTML bool, interactionHandler InteractionHandler) *RenderSubagent {
 	return &RenderSubagent{
-		verbose: verbose,
+		verbose:            verbose,
+		renderHTML:         renderHTML,
+		interactionHandler: interactionHandler,
 	}
 }
 
@@ -284,6 +328,9 @@ func (r *RenderSubagent) Type() TaskType {
 func (r *RenderSubagent) Execute(ctx context.Context, task Task) (Result, error) {
 	if r.verbose {
 		fmt.Println("🎨 Render Subagent")
+	}
+	if r.interactionHandler != nil {
+		r.interactionHandler.Log(fmt.Sprintf("> Render Subagent: %s", task.Description))
 	}
 
 	// Get content from parameters or description
@@ -324,13 +371,29 @@ func (r *RenderSubagent) Execute(ctx context.Context, task Task) (Result, error)
 	if r.verbose {
 		fmt.Printf("  Rendering %d bytes of content\n", len(content))
 	}
+	if r.interactionHandler != nil {
+		r.interactionHandler.Log(fmt.Sprintf("Rendering %d bytes of content", len(content)))
+	}
 
 	// Render markdown
-	result := markdown.Render(content, 80, 6)
+	var output string
+	if r.renderHTML {
+		extensions := parser.CommonExtensions | parser.AutoHeadingIDs
+		p := parser.NewWithExtensions(extensions)
+		doc := p.Parse([]byte(content))
+
+		htmlFlags := html.CommonFlags | html.HrefTargetBlank | html.CompletePage
+		opts := html.RendererOptions{Flags: htmlFlags, Title: "Agent Report"}
+		renderer := html.NewRenderer(opts)
+
+		output = string(gomarkdown.Render(doc, renderer))
+	} else {
+		output = string(markdown.Render(content, 80, 6))
+	}
 
 	return Result{
 		TaskType: TaskTypeRender,
 		Success:  true,
-		Output:   string(result),
+		Output:   output,
 	}, nil
 }

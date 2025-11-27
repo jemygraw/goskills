@@ -54,4 +54,7 @@ type InteractionHandler interface {
 	// ConfirmPodcastGeneration asks the user if they want to generate a podcast from the report.
 	// Returns true if confirmed.
 	ConfirmPodcastGeneration(report string) (bool, error)
+
+	// Log sends a log message to the user interface.
+	Log(message string)
 }
