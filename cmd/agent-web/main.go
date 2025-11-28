@@ -36,6 +36,7 @@ type Event struct {
 	Type    string      `json:"type"`
 	Content string      `json:"content,omitempty"`
 	Plan    *agent.Plan `json:"plan,omitempty"`
+	Podcast interface{} `json:"podcast,omitempty"`
 }
 
 func NewWebInteractionHandler() *WebInteractionHandler {
@@ -71,8 +72,8 @@ func (h *WebInteractionHandler) ReviewSearchResults(results string) (bool, error
 }
 
 func (h *WebInteractionHandler) ConfirmPodcastGeneration(report string) (bool, error) {
-	// Auto-approve or skip for now
-	return false, nil
+	// Auto-approve for web interface
+	return true, nil
 }
 
 func (h *WebInteractionHandler) Log(message string) {
@@ -220,6 +221,29 @@ func runServer(cmd *cobra.Command, args []string) {
 				return
 			}
 
+			// Ensure PODCAST task exists if REPORT task is present
+			hasReport := false
+			hasPodcast := false
+			for _, task := range plan.Tasks {
+				if task.Type == agent.TaskTypeReport {
+					hasReport = true
+				}
+				if task.Type == agent.TaskTypePodcast {
+					hasPodcast = true
+				}
+			}
+
+			if hasReport && !hasPodcast {
+				plan.Tasks = append(plan.Tasks, agent.Task{
+					Type:        agent.TaskTypePodcast,
+					Description: "Generate a podcast script from the report",
+					Parameters: map[string]interface{}{
+						"content": "Use the content from the previous REPORT task.",
+					},
+				})
+				handler.Log("➕ Added missing PODCAST task to plan")
+			}
+
 			// Execute
 			results, err := planningAgent.Execute(context.Background(), plan)
 			if err != nil {
@@ -230,14 +254,21 @@ func runServer(cmd *cobra.Command, args []string) {
 				return
 			}
 
-			// Extract final output
+			// Extract final output and podcast script
 			var finalOutput string
+			var podcastScript interface{}
+
 			for i := len(results) - 1; i >= 0; i-- {
 				if (results[i].TaskType == agent.TaskTypeRender || results[i].TaskType == agent.TaskTypeReport) && results[i].Success {
-					finalOutput = results[i].Output
-					break
+					if finalOutput == "" {
+						finalOutput = results[i].Output
+					}
+				}
+				if results[i].TaskType == agent.TaskTypePodcast && results[i].Success {
+					podcastScript = results[i].Metadata["script"]
 				}
 			}
+
 			if finalOutput == "" {
 				for _, result := range results {
 					if result.Success {
@@ -252,6 +283,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			handler.Broadcast(Event{
 				Type:    "response",
 				Content: finalOutput,
+				Podcast: podcastScript,
 			})
 
 			handler.Broadcast(Event{

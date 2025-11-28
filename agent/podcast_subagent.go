@@ -11,17 +11,19 @@ import (
 
 // PodcastSubagent generates a podcast from a report.
 type PodcastSubagent struct {
-	client  *openai.Client
-	model   string
-	verbose bool
+	client             *openai.Client
+	model              string
+	verbose            bool
+	interactionHandler InteractionHandler
 }
 
 // NewPodcastSubagent creates a new PodcastSubagent.
-func NewPodcastSubagent(client *openai.Client, model string, verbose bool) *PodcastSubagent {
+func NewPodcastSubagent(client *openai.Client, model string, verbose bool, interactionHandler InteractionHandler) *PodcastSubagent {
 	return &PodcastSubagent{
-		client:  client,
-		model:   model,
-		verbose: verbose,
+		client:             client,
+		model:              model,
+		verbose:            verbose,
+		interactionHandler: interactionHandler,
 	}
 }
 
@@ -40,6 +42,9 @@ type DialogueLine struct {
 func (p *PodcastSubagent) Execute(ctx context.Context, task Task) (Result, error) {
 	if p.verbose {
 		fmt.Println("🎙️ Podcast Subagent")
+	}
+	if p.interactionHandler != nil {
+		p.interactionHandler.Log(fmt.Sprintf("> Podcast Subagent: %s", task.Description))
 	}
 
 	// Get content from parameters or description
@@ -64,6 +69,9 @@ func (p *PodcastSubagent) Execute(ctx context.Context, task Task) (Result, error
 
 	if p.verbose {
 		fmt.Printf("  ✓ Script generated (%d lines)\n", len(script))
+	}
+	if p.interactionHandler != nil {
+		p.interactionHandler.Log(fmt.Sprintf("✓ Script generated (%d lines)", len(script)))
 	}
 
 	// Convert script to JSON string for output

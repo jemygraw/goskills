@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const viewBtn = document.createElement('button');
                 viewBtn.textContent = 'View Report';
                 viewBtn.className = 'view-report-btn';
-                viewBtn.style.cssText = 'background: #2da44e; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem;';
+                viewBtn.style.cssText = 'background: #2da44e; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem; margin-right: 10px;';
 
                 // Capture current content and reportCount for this button
                 const currentContent = data.content;
@@ -174,14 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (existingTab) {
                         activateTab(currentTabId);
                     } else {
-                        // Re-create tab if it was closed
-                        // We reuse the old ID to keep the button working consistently or create a new one?
-                        // Let's create a new one to avoid ID conflicts if logic changes,
-                        // but ideally we want to restore "Report N".
-                        // For simplicity, let's just re-create it with a new ID but same content.
                         const newTabId = createReportTab(currentContent);
-                        // Update the button to point to the new tab?
-                        // Or just activate the new tab.
                         activateTab(newTabId);
                     }
                 };
@@ -189,6 +182,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 const div = document.createElement('div');
                 div.className = 'log-line info';
                 div.appendChild(viewBtn);
+
+                // Handle Podcast
+                if (data.podcast) {
+                    const podcastBtn = document.createElement('button');
+                    podcastBtn.textContent = 'View Podcast';
+                    podcastBtn.className = 'view-podcast-btn';
+                    podcastBtn.style.cssText = 'background: #00add8; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem;';
+
+                    const podcastScript = data.podcast;
+                    let podcastTabId = null;
+
+                    podcastBtn.onclick = () => {
+                        if (podcastTabId) {
+                            const existingTab = document.querySelector(`.tab[data-tab="${podcastTabId}"]`);
+                            if (existingTab) {
+                                activateTab(podcastTabId);
+                                return;
+                            }
+                        }
+                        podcastTabId = createPodcastTab(podcastScript);
+                        activateTab(podcastTabId);
+                    };
+                    div.appendChild(podcastBtn);
+                }
+
                 terminalContainer.appendChild(div);
                 terminalContainer.scrollTop = terminalContainer.scrollHeight;
                 break;
@@ -202,6 +220,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 addLog('success', 'Task completed.');
                 break;
         }
+    }
+
+    function createPodcastTab(script) {
+        reportCount++; // Reuse report counter for unique IDs
+        const tabId = `podcast-${reportCount}`;
+
+        // Create Tab
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.tab = tabId;
+        tab.innerHTML = `
+            Podcast ${reportCount}
+            <span class="close-tab" title="Close Podcast"><i class="fas fa-times"></i></span>
+        `;
+
+        // Create Content Container
+        const container = document.createElement('div');
+        container.id = `${tabId}-container`;
+        container.className = 'tab-content';
+
+        // Render script
+        let scriptHtml = '<div class="podcast-script">';
+        if (Array.isArray(script)) {
+            script.forEach(line => {
+                const speakerClass = line.speaker.toLowerCase().replace(/\s+/g, '-');
+                scriptHtml += `
+                    <div class="dialogue-line ${speakerClass}">
+                        <div class="speaker">${line.speaker}</div>
+                        <div class="text">${line.text}</div>
+                    </div>
+                `;
+            });
+        } else {
+            scriptHtml += `<pre>${JSON.stringify(script, null, 2)}</pre>`;
+        }
+        scriptHtml += '</div>';
+
+        container.innerHTML = `<div class="report-content">${scriptHtml}</div>`;
+
+        // Add to DOM
+        tabsContainer.appendChild(tab);
+        rightPanel.appendChild(container);
+
+        // Event Listeners
+        tab.addEventListener('click', (e) => {
+            if (!e.target.closest('.close-tab')) {
+                activateTab(tabId);
+            }
+        });
+
+        tab.querySelector('.close-tab').addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeReportTab(tabId);
+        });
+
+        return tabId;
     }
 
     function handleLog(content) {

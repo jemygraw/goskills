@@ -55,25 +55,35 @@ func NewPlanningAgent(config AgentConfig, interactionHandler InteractionHandler)
 	agent.subagents[TaskTypeAnalyze] = NewAnalysisSubagent(client, config.Model, config.Verbose, interactionHandler)
 	agent.subagents[TaskTypeReport] = NewReportSubagent(client, config.Model, config.Verbose, interactionHandler)
 	agent.subagents[TaskTypeRender] = NewRenderSubagent(config.Verbose, config.RenderHTML, interactionHandler)
-	agent.subagents[TaskTypePodcast] = NewPodcastSubagent(client, config.Model, config.Verbose)
+	agent.subagents[TaskTypePodcast] = NewPodcastSubagent(client, config.Model, config.Verbose, interactionHandler)
 
 	return agent, nil
 }
 
 // Plan decomposes a user request into subtasks.
 func (a *PlanningAgent) Plan(ctx context.Context, userRequest string) (*Plan, error) {
+	if a.config.Verbose {
+		fmt.Println("🧠 Planning Agent")
+	}
+	if a.interactionHandler != nil {
+		a.interactionHandler.Log("🧠 Planning...")
+	}
+
 	systemPrompt := `You are a planning agent that breaks down user requests into subtasks.
-You have access to three types of subagents:
+You have access to the following subagents:
 - SEARCH: Performs web searches to gather information
 - ANALYZE: Analyzes and synthesizes gathered information
 - REPORT: Generates formatted reports from analyzed data
+- PODCAST: Generates a podcast script from the report (TaskType: PODCAST)
 - RENDER: Renders markdown content to terminal-friendly format
 
 For the given user request, create a plan with a sequence of tasks.
 Each task should have:
-- type: one of SEARCH, ANALYZE, REPORT, or RENDER
+- type: one of SEARCH, ANALYZE, REPORT, PODCAST, or RENDER
 - description: what the subagent should do
 - parameters: optional parameters for the task (e.g., {"query": "search term"})
+
+IMPORTANT: Unless the user explicitly asks NOT to generate a podcast, you should ALWAYS include a PODCAST task after the REPORT task to generate a podcast script from the report content.
 
 Return ONLY a valid JSON object with this structure:
 {
@@ -82,11 +92,12 @@ Return ONLY a valid JSON object with this structure:
     {"type": "SEARCH", "description": "...", "parameters": {"query": "..."}},
     {"type": "ANALYZE", "description": "..."},
     {"type": "REPORT", "description": "..."},
+    {"type": "PODCAST", "description": "Generate a podcast script from the report"},
     {"type": "RENDER", "description": "Render the report"}
   ]
 }
 
-Keep plans simple and focused. Typically 2-4 tasks are sufficient.`
+Keep plans simple and focused. Typically 3-5 tasks are sufficient.`
 
 	// Inject global context from history
 	var globalContextBuilder strings.Builder
@@ -148,12 +159,14 @@ Keep plans simple and focused. Typically 2-4 tasks are sufficient.`
 	}
 
 	if a.config.Verbose {
-		fmt.Println("🧠 Planning Agent")
 		fmt.Printf("📋 Plan: %s\n", plan.Description)
 		for i, task := range plan.Tasks {
 			fmt.Printf("  %d. [%s] %s\n", i+1, task.Type, task.Description)
 		}
 		fmt.Println()
+	}
+	if a.interactionHandler != nil {
+		a.interactionHandler.Log(fmt.Sprintf("📋 Plan generated: %s", plan.Description))
 	}
 
 	return &plan, nil
@@ -188,6 +201,7 @@ func (a *PlanningAgent) PlanWithReview(ctx context.Context, userRequest string) 
 		if a.config.Verbose {
 			fmt.Printf("🔄 Re-planning based on user feedback: %s\n\n", modification)
 		}
+		a.interactionHandler.Log(fmt.Sprintf("🔄 Re-planning based on user feedback: %s", modification))
 
 		plan, err = a.Plan(ctx, modification)
 		if err != nil {
