@@ -49,8 +49,37 @@ func (p *PodcastSubagent) Execute(ctx context.Context, task Task) (Result, error
 
 	// Get content from parameters or description
 	content, ok := task.Parameters["content"].(string)
-	if !ok {
-		content = task.Description
+	if !ok || content == "Use the content from the previous REPORT task." {
+		// Try to get from context (passed from previous task)
+		if ctxContent, ok := task.Parameters["context"].([]string); ok && len(ctxContent) > 0 {
+			// Try to find the output from the REPORT task
+			var foundReport bool
+			for i := len(ctxContent) - 1; i >= 0; i-- {
+				if strings.Contains(ctxContent[i], "Output from REPORT task:") {
+					content = ctxContent[i]
+					// Extract the content after the header
+					if idx := strings.Index(content, "\n"); idx != -1 {
+						content = content[idx+1:]
+					}
+					foundReport = true
+					break
+				}
+			}
+
+			if !foundReport {
+				// If no REPORT output found, use the last task's output
+				content = ctxContent[len(ctxContent)-1]
+				// Extract the content after the header if present
+				if idx := strings.Index(content, "Output from "); idx != -1 {
+					if newlineIdx := strings.Index(content[idx:], "\n"); newlineIdx != -1 {
+						content = content[idx+newlineIdx+1:]
+					}
+				}
+			}
+			content = strings.TrimSpace(content)
+		} else if !ok {
+			content = task.Description
+		}
 	}
 
 	if p.verbose {
