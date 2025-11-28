@@ -256,7 +256,7 @@ func (r *ReportSubagent) Execute(ctx context.Context, task Task) (Result, error)
 
 	// Check for global context
 	globalContext, _ := task.Parameters["global_context"].(string)
-	systemPrompt := "You are a report writing assistant that creates well-formatted, clear, and comprehensive reports in Markdown format. Use appropriate headings, lists, and formatting to make the report easy to read."
+	systemPrompt := "You are a report writing assistant that creates well-formatted, clear, and comprehensive reports in Markdown format. Use appropriate headings, lists, and formatting to make the report easy to read. If the provided information includes images with URLs and descriptions, select the most relevant ones and embed them in the report using standard Markdown image syntax: `![Description](URL)`. Place images near the relevant text sections."
 	if globalContext != "" {
 		systemPrompt += "\n\nIMPORTANT CONTEXT/INSTRUCTIONS FROM USER:\n" + globalContext
 	}

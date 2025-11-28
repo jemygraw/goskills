@@ -17,6 +17,7 @@ func TavilySearch(query string) (string, error) {
 }
 
 // TavilySearchWithLimit performs a web search using the Tavily API with a custom result limit.
+// TavilySearchWithLimit performs a web search using the Tavily API with a custom result limit.
 func TavilySearchWithLimit(query string, maxResults int) (string, error) {
 	apiKey := os.Getenv("TAVILY_API_KEY")
 	if apiKey == "" {
@@ -31,9 +32,10 @@ func TavilySearchWithLimit(query string, maxResults int) (string, error) {
 	}
 
 	requestBody, err := json.Marshal(map[string]interface{}{
-		"query":        query,
-		"search_depth": "basic",
-		"max_results":  maxResults,
+		"query":          query,
+		"search_depth":   "basic",
+		"max_results":    maxResults,
+		"include_images": true,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
@@ -68,6 +70,7 @@ func TavilySearchWithLimit(query string, maxResults int) (string, error) {
 			URL     string `json:"url"`
 			Content string `json:"content"`
 		} `json:"results"`
+		Images []string `json:"images"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -77,6 +80,14 @@ func TavilySearchWithLimit(query string, maxResults int) (string, error) {
 	var sb bytes.Buffer
 	for _, item := range result.Results {
 		sb.WriteString(fmt.Sprintf("Title: %s\nURL: %s\nContent: %s\n\n", item.Title, item.URL, item.Content))
+	}
+
+	if len(result.Images) > 0 {
+		sb.WriteString("\nRelevant Images:\n")
+		for _, imgURL := range result.Images {
+			sb.WriteString(fmt.Sprintf("- Image URL: %s\n", imgURL))
+		}
+		sb.WriteString("\n")
 	}
 
 	if sb.Len() == 0 {
