@@ -8,12 +8,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTaskIndex = -1;
     let tasks = [];
 
+    // Generate unique session ID
+    const sessionId = 'session-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+    console.log('Session ID:', sessionId);
+
     // Auto-resize textarea
     userInput.addEventListener('input', function () {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
         if (this.value === '') {
             this.style.height = '';
+        }
+    });
+
+    // Submit on Enter (Shift+Enter for new line)
+    userInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit'));
         }
     });
 
@@ -40,7 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: text }),
+                body: JSON.stringify({
+                    message: text,
+                    session_id: sessionId
+                }),
             });
 
             if (!response.ok) {
@@ -58,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function connectSSE() {
-        eventSource = new EventSource('/events');
+        eventSource = new EventSource(`/events?session_id=${sessionId}`);
 
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -443,7 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ response: content }),
+                body: JSON.stringify({
+                    response: content,
+                    session_id: sessionId
+                }),
             });
         } catch (error) {
             console.error('Error sending response:', error);

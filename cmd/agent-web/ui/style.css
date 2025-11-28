@@ -258,7 +258,8 @@ header h1 {
 }
 
 /* Specific style for report containers generated dynamically */
-[id^="report-"][id$="-container"] {
+[id^="report-"][id$="-container"],
+[id^="podcast-"][id$="-container"] {
     background-color: white;
     color: #24292f;
     overflow-y: auto;

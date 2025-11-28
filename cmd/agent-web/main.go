@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/smallnest/goskills/agent"
 	"github.com/spf13/cobra"
@@ -87,6 +89,58 @@ func (h *WebInteractionHandler) Broadcast(event Event) {
 	h.eventChan <- event
 }
 
+// Session represents a user session
+type Session struct {
+	ID        string
+	Agent     *agent.PlanningAgent
+	Handler   *WebInteractionHandler
+	CreatedAt time.Time
+}
+
+// SessionManager manages user sessions
+type SessionManager struct {
+	sessions map[string]*Session
+	mu       sync.RWMutex
+}
+
+func NewSessionManager() *SessionManager {
+	return &SessionManager{
+		sessions: make(map[string]*Session),
+	}
+}
+
+func (sm *SessionManager) GetSession(id string) *Session {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.sessions[id]
+}
+
+func (sm *SessionManager) CreateSession(id string, config agent.AgentConfig) (*Session, error) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	// Check if session already exists
+	if session, ok := sm.sessions[id]; ok {
+		return session, nil
+	}
+
+	handler := NewWebInteractionHandler()
+	planningAgent, err := agent.NewPlanningAgent(config, handler)
+	if err != nil {
+		return nil, err
+	}
+
+	session := &Session{
+		ID:        id,
+		Agent:     planningAgent,
+		Handler:   handler,
+		CreatedAt: time.Now(),
+	}
+
+	sm.sessions[id] = session
+	return session, nil
+}
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "agent-web",
@@ -111,10 +165,8 @@ func runServer(cmd *cobra.Command, args []string) {
 		log.Fatal("API key is required")
 	}
 
-	handler := NewWebInteractionHandler()
-
-	// Initialize agent config
-	config := agent.AgentConfig{
+	// Initialize agent config template
+	configTemplate := agent.AgentConfig{
 		APIKey:     apiKey,
 		APIBase:    apiBase,
 		Model:      model,
@@ -122,8 +174,9 @@ func runServer(cmd *cobra.Command, args []string) {
 		RenderHTML: true,
 	}
 
+	sessionManager := NewSessionManager()
+
 	// Serve static files
-	// Use fs.Sub to get the "ui" subdirectory from the embedded filesystem
 	uiFS, err := fs.Sub(uiAssets, "ui")
 	if err != nil {
 		log.Fatal(err)
@@ -132,16 +185,31 @@ func runServer(cmd *cobra.Command, args []string) {
 
 	// API endpoints
 	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.URL.Query().Get("session_id")
+		if sessionID == "" {
+			http.Error(w, "Session ID required", http.StatusBadRequest)
+			return
+		}
+
+		// Create session if it doesn't exist (on connection)
+		session, err := sessionManager.CreateSession(sessionID, configTemplate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("X-Accel-Buffering", "no") // Disable Nginx buffering
+		w.Header().Set("X-Accel-Buffering", "no")
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 			return
 		}
+
+		handler := session.Handler
 
 		for {
 			select {
@@ -158,13 +226,6 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 	})
 
-	// Create a single agent instance for the session
-	// Note: In a real multi-user app, this should be managed per session/user
-	planningAgent, err := agent.NewPlanningAgent(config, handler)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	http.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -172,12 +233,32 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 
 		var req struct {
-			Message string `json:"message"`
+			Message   string `json:"message"`
+			SessionID string `json:"session_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		if req.SessionID == "" {
+			http.Error(w, "Session ID required", http.StatusBadRequest)
+			return
+		}
+
+		session := sessionManager.GetSession(req.SessionID)
+		if session == nil {
+			// Try to create it if missing (e.g. server restart)
+			var err error
+			session, err = sessionManager.CreateSession(req.SessionID, configTemplate)
+			if err != nil {
+				http.Error(w, "Failed to create session", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		planningAgent := session.Agent
+		handler := session.Handler
 
 		// Run agent in a goroutine
 		go func() {
@@ -301,19 +382,30 @@ func runServer(cmd *cobra.Command, args []string) {
 		}
 
 		var req struct {
-			Response string `json:"response"`
+			Response  string `json:"response"`
+			SessionID string `json:"session_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
+		if req.SessionID == "" {
+			http.Error(w, "Session ID required", http.StatusBadRequest)
+			return
+		}
+
+		session := sessionManager.GetSession(req.SessionID)
+		if session == nil {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+
 		// Send response to the waiting channel
-		// Non-blocking send to avoid hanging if no one is listening
 		select {
-		case handler.responseChan <- req.Response:
+		case session.Handler.responseChan <- req.Response:
 		default:
-			// No one waiting, maybe log warning
+			// No one waiting
 		}
 
 		w.WriteHeader(http.StatusOK)
