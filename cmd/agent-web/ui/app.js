@@ -500,15 +500,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // TEMPORARY: Test Podcast Tab
-    setTimeout(() => {
-        const dummyScript = [
-            { speaker: "Host 1", text: "Welcome to the test podcast." },
-            { speaker: "Host 2", text: "This is a test to verify the export button." },
-            { speaker: "Host 1", text: "Excellent. Let's see if it works." }
-        ];
-        const tabId = createPodcastTab(dummyScript);
-        activateTab(tabId);
-        addLog('info', 'Created test podcast tab.');
-    }, 1000);
+
 });
