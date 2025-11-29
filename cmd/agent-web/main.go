@@ -302,28 +302,8 @@ func runServer(cmd *cobra.Command, args []string) {
 				return
 			}
 
-			// Ensure PODCAST task exists if REPORT task is present
-			hasReport := false
-			hasPodcast := false
-			for _, task := range plan.Tasks {
-				if task.Type == agent.TaskTypeReport {
-					hasReport = true
-				}
-				if task.Type == agent.TaskTypePodcast {
-					hasPodcast = true
-				}
-			}
-
-			if hasReport && !hasPodcast {
-				plan.Tasks = append(plan.Tasks, agent.Task{
-					Type:        agent.TaskTypePodcast,
-					Description: "Generate a podcast script from the report",
-					Parameters: map[string]interface{}{
-						"content": "Use the content from the previous REPORT task.",
-					},
-				})
-				handler.Log("➕ Added missing PODCAST task to plan")
-			}
+			// Ensure PODCAST task exists if REPORT task is present - REMOVED logic to force podcast
+			// The user must explicitly request a podcast for it to be included.
 
 			// Execute
 			results, err := planningAgent.Execute(context.Background(), plan)

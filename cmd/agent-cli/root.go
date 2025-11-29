@@ -244,48 +244,8 @@ Special commands:
 			}
 			fmt.Println(finalOutput)
 
-			// Check if podcast was already generated
-			podcastGenerated := false
-			for _, result := range results {
-				if result.TaskType == agent.TaskTypePodcast && result.Success {
-					podcastGenerated = true
-					break
-				}
-			}
-
-			// Ask for podcast generation only if not already generated
-			if !podcastGenerated {
-				confirm, err := interactionHandler.ConfirmPodcastGeneration(finalOutput)
-				if err == nil && confirm {
-					fmt.Println("🎙️ Generating podcast script...")
-
-					// Create a plan for podcast generation
-					podcastPlan := &agent.Plan{
-						Description: "Generate podcast script",
-						Tasks: []agent.Task{
-							{
-								Type:        agent.TaskTypePodcast,
-								Description: "Generate podcast script from the report",
-								Parameters: map[string]interface{}{
-									"content": finalOutput,
-								},
-							},
-						},
-					}
-
-					results, err := planningAgent.Execute(ctx, podcastPlan)
-					if err != nil {
-						fmt.Printf("\n❌ Error: %v\n", err)
-						continue
-					}
-
-					for _, result := range results {
-						if result.Success {
-							fmt.Println("\n" + result.Output)
-						}
-					}
-				}
-			}
+			// Podcast generation is now handled by the planner based on user request.
+			// We no longer automatically prompt for it here.
 		}
 		if err := scanner.Err(); err != nil {
 			return fmt.Errorf("error reading input: %w", err)

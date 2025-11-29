@@ -83,7 +83,7 @@ Each task should have:
 - description: what the subagent should do
 - parameters: optional parameters for the task (e.g., {"query": "search term"})
 
-IMPORTANT: Unless the user explicitly asks NOT to generate a podcast, you should ALWAYS include a PODCAST task after the REPORT task to generate a podcast script from the report content.
+IMPORTANT: ONLY include a PODCAST task if the user explicitly requests a podcast. If the user does not ask for a podcast, DO NOT include this task.
 
 Return ONLY a valid JSON object with this structure:
 {
@@ -92,7 +92,6 @@ Return ONLY a valid JSON object with this structure:
     {"type": "SEARCH", "description": "...", "parameters": {"query": "..."}},
     {"type": "ANALYZE", "description": "..."},
     {"type": "REPORT", "description": "..."},
-    {"type": "PODCAST", "description": "Generate a podcast script from the report"},
     {"type": "RENDER", "description": "Render the report"}
   ]
 }
@@ -108,7 +107,7 @@ Keep plans simple and focused. Typically 3-5 tasks are sufficient.`
 	}
 
 	if a.interactionHandler != nil {
-		globalContextBuilder.WriteString("User: 根据用户的输入的文字，决定使用哪种语言，默认简体中文\n")
+		globalContextBuilder.WriteString("User: 根据用户的输入的文字，决定使用哪种语言，默认整个session使用简体中文\n")
 	}
 
 	if globalContextBuilder.Len() > 0 {
