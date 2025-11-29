@@ -25,6 +25,7 @@ type AgentConfig struct {
 	Model      string
 	Verbose    bool
 	RenderHTML bool
+	OutputDir  string
 }
 
 // NewPlanningAgent creates and initializes a new PlanningAgent.
@@ -34,6 +35,9 @@ func NewPlanningAgent(config AgentConfig, interactionHandler InteractionHandler)
 	}
 	if config.Model == "" {
 		config.Model = "gpt-4o" // Default model
+	}
+	if config.OutputDir == "" {
+		config.OutputDir = "generated" // Default output directory
 	}
 
 	openaiConfig := openai.DefaultConfig(config.APIKey)
@@ -56,6 +60,7 @@ func NewPlanningAgent(config AgentConfig, interactionHandler InteractionHandler)
 	agent.subagents[TaskTypeReport] = NewReportSubagent(client, config.Model, config.Verbose, interactionHandler)
 	agent.subagents[TaskTypeRender] = NewRenderSubagent(config.Verbose, config.RenderHTML, interactionHandler)
 	agent.subagents[TaskTypePodcast] = NewPodcastSubagent(client, config.Model, config.Verbose, interactionHandler)
+	agent.subagents[TaskTypePPT] = NewPPTSubagent(client, config.Model, config.Verbose, interactionHandler, config.OutputDir)
 
 	return agent, nil
 }
@@ -75,15 +80,19 @@ You have access to the following subagents:
 - ANALYZE: Analyzes and synthesizes gathered information
 - REPORT: Generates formatted reports from analyzed data
 - PODCAST: Generates a podcast script from the report (TaskType: PODCAST)
+- PPT: Generates a slide deck (HTML) from the report (TaskType: PPT)
 - RENDER: Renders markdown content to terminal-friendly format
 
 For the given user request, create a plan with a sequence of tasks.
 Each task should have:
-- type: one of SEARCH, ANALYZE, REPORT, PODCAST, or RENDER
+- type: one of SEARCH, ANALYZE, REPORT, PODCAST, PPT, or RENDER
 - description: what the subagent should do
 - parameters: optional parameters for the task (e.g., {"query": "search term"})
 
-IMPORTANT: ONLY include a PODCAST task if the user explicitly requests a podcast. If the user does not ask for a podcast, DO NOT include this task.
+IMPORTANT: 
+- ONLY include a PODCAST task if the user explicitly requests a podcast.
+- ONLY include a PPT task if the user explicitly requests slides or a presentation.
+- ALWAYS include a RENDER task after the REPORT task to generate the final text report.
 
 Return ONLY a valid JSON object with this structure:
 {
@@ -92,6 +101,7 @@ Return ONLY a valid JSON object with this structure:
     {"type": "SEARCH", "description": "...", "parameters": {"query": "..."}},
     {"type": "ANALYZE", "description": "..."},
     {"type": "REPORT", "description": "..."},
+    {"type": "PPT", "description": "Generate a slide deck from the report"},
     {"type": "RENDER", "description": "Render the report"}
   ]
 }
@@ -107,7 +117,7 @@ Keep plans simple and focused. Typically 3-5 tasks are sufficient.`
 	}
 
 	if a.interactionHandler != nil {
-		globalContextBuilder.WriteString("User: 根据用户的输入的文字，决定使用哪种语言，默认整个session使用简体中文\n")
+		globalContextBuilder.WriteString("User: 根据用户的输入的文字，首先决定会话中使用哪种语言，默认整个会话使用简体中文\n")
 	}
 
 	if globalContextBuilder.Len() > 0 {

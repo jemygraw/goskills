@@ -11,6 +11,7 @@ const (
 	TaskTypeReport  TaskType = "REPORT"
 	TaskTypeRender  TaskType = "RENDER"
 	TaskTypePodcast TaskType = "PODCAST"
+	TaskTypePPT     TaskType = "PPT"
 )
 
 // Task represents a subtask to be executed by a subagent.

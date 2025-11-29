@@ -39,6 +39,7 @@ type Event struct {
 	Content string      `json:"content,omitempty"`
 	Plan    *agent.Plan `json:"plan,omitempty"`
 	Podcast interface{} `json:"podcast,omitempty"`
+	PPT     string      `json:"ppt,omitempty"`
 }
 
 func NewWebInteractionHandler() *WebInteractionHandler {
@@ -183,6 +184,10 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 	http.Handle("/", http.FileServer(http.FS(uiFS)))
 
+	// Serve generated files
+	os.MkdirAll("generated", 0755)
+	http.Handle("/generated/", http.StripPrefix("/generated/", http.FileServer(http.Dir("generated"))))
+
 	// API endpoints
 	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		sessionID := r.URL.Query().Get("session_id")
@@ -318,6 +323,7 @@ func runServer(cmd *cobra.Command, args []string) {
 			// Extract final output and podcast script
 			var finalOutput string
 			var podcastScript interface{}
+			var pptURL string
 
 			for i := len(results) - 1; i >= 0; i-- {
 				if (results[i].TaskType == agent.TaskTypeRender || results[i].TaskType == agent.TaskTypeReport) && results[i].Success {
@@ -327,6 +333,11 @@ func runServer(cmd *cobra.Command, args []string) {
 				}
 				if results[i].TaskType == agent.TaskTypePodcast && results[i].Success {
 					podcastScript = results[i].Metadata["script"]
+				}
+				if results[i].TaskType == agent.TaskTypePPT && results[i].Success {
+					if url, ok := results[i].Metadata["ppt_url"].(string); ok {
+						pptURL = url
+					}
 				}
 			}
 
@@ -345,6 +356,7 @@ func runServer(cmd *cobra.Command, args []string) {
 				Type:    "response",
 				Content: finalOutput,
 				Podcast: podcastScript,
+				PPT:     pptURL,
 			})
 
 			handler.Broadcast(Event{

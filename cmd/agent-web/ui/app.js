@@ -203,7 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const podcastBtn = document.createElement('button');
                     podcastBtn.textContent = 'View Podcast';
                     podcastBtn.className = 'view-podcast-btn';
-                    podcastBtn.style.cssText = 'background: #00add8; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem;';
+                    podcastBtn.style.cssText = 'background: #00add8; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem; margin-right: 10px;';
 
                     const podcastScript = data.podcast;
                     let podcastTabId = null;
@@ -220,6 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         activateTab(podcastTabId);
                     };
                     div.appendChild(podcastBtn);
+                }
+
+                // Handle PPT
+                if (data.ppt) {
+                    const pptBtn = document.createElement('button');
+                    pptBtn.textContent = 'View PPT';
+                    pptBtn.className = 'view-ppt-btn';
+                    pptBtn.style.cssText = 'background: #8e44ad; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 0.85rem;';
+
+                    pptBtn.onclick = () => {
+                        window.open(data.ppt, '_blank');
+                    };
+                    div.appendChild(pptBtn);
                 }
 
                 terminalContainer.appendChild(div);
