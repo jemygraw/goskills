@@ -153,7 +153,7 @@ func main() {
 	rootCmd.Flags().StringVar(&apiBase, "api-base", os.Getenv("OPENAI_API_BASE"), "OpenAI API Base URL")
 	rootCmd.Flags().StringVar(&model, "model", os.Getenv("OPENAI_MODEL"), "OpenAI Model")
 	rootCmd.Flags().StringVar(&addr, "addr", "127.0.0.1:8080", "Address to listen on")
-	rootCmd.Flags().BoolVar(&verbose, "verbose", false, "Verbose output")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

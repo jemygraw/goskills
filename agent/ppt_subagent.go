@@ -120,11 +120,24 @@ func (p *PPTSubagent) Execute(ctx context.Context, task Task) (Result, error) {
 	// 2. Generate and Build
 	url, err := p.GenerateAndBuild(slides)
 	if err != nil {
+		// Log detailed error to terminal/logs
+		if p.verbose {
+			fmt.Printf("❌ PPT Build Failed: %v\n", err)
+		}
+		if p.interactionHandler != nil {
+			// We might want to log it here too, but maybe truncated or full?
+			// The user said "print to terminal logs", implying server side.
+			// But interactionHandler.Log sends to the UI.
+			// Let's log a simplified message to UI and keep full detail in terminal.
+			p.interactionHandler.Log("❌ PPT Build Failed. Check server logs for details.")
+		}
+
+		// Return a generic error message in the Result so the UI doesn't get cluttered
 		return Result{
 			TaskType: TaskTypePPT,
 			Success:  false,
-			Error:    fmt.Sprintf("failed to build presentation: %v", err),
-		}, err
+			Error:    "Presentation build failed. Please check the server logs for details.",
+		}, nil
 	}
 
 	return Result{
@@ -282,10 +295,9 @@ Example:
 func (p *PPTSubagent) generateSlidevMarkdown(slides []Slide) string {
 	var sb strings.Builder
 
-	// 1. Global Frontmatter (applies to Slide 1)
+	// 1. Global Frontmatter
 	sb.WriteString("---\n")
 	sb.WriteString("theme: default\n")
-	// sb.WriteString("class: text-center\n") // Move to specific slides if needed, or keep global if mostly centered
 	sb.WriteString("highlighter: shiki\n")
 	sb.WriteString("lineNumbers: false\n")
 	sb.WriteString("info: | \n")
@@ -294,38 +306,42 @@ func (p *PPTSubagent) generateSlidevMarkdown(slides []Slide) string {
 	sb.WriteString("  enabled: false\n")
 	sb.WriteString("transition: slide-left\n")
 	sb.WriteString("mdc: true\n")
-	// sb.WriteString("unocss: true\n") // Optional, usually enabled by default in recent versions or via plugin
+	// Dark theme background
+	sb.WriteString("background: https://picsum.photos/1920/1080?blur=4\n")
+	// sb.WriteString("class: text-white\n") // Removed global class to avoid duplicates
 
-	// Inject first slide layout into global FM
+	// Inject first slide layout
 	if len(slides) > 0 {
 		s0 := slides[0]
 		if s0.Layout == "split-image-right" {
 			sb.WriteString("layout: image-right\n")
 			img := s0.Image
 			if img == "" || !strings.HasPrefix(img, "http") || strings.Contains(img, "source.unsplash.com") {
-				img = fmt.Sprintf("https://picsum.photos/800/600?random=0")
+				img = "https://picsum.photos/800/600?random=0"
 			}
 			sb.WriteString(fmt.Sprintf("image: %s\n", img))
+			sb.WriteString("class: text-white\n")
 		} else if s0.Layout == "title-center" {
 			sb.WriteString("layout: center\n")
-			sb.WriteString("class: text-center\n")
+			sb.WriteString("class: text-center text-white\n")
 		} else if s0.Layout == "two-cols" {
 			sb.WriteString("layout: two-cols\n")
+			sb.WriteString("class: text-white\n")
 		} else {
-			// default
 			sb.WriteString("layout: default\n")
+			sb.WriteString("class: text-white\n")
 		}
+	} else {
+		// Fallback if no slides
+		sb.WriteString("class: text-white\n")
 	}
 	sb.WriteString("---\n\n")
 
 	// 2. Generate Slides
 	for i, slide := range slides {
-		// For the first slide (i==0), FM is already written globally.
-		// For subsequent slides, we need a separator and local FM.
 		if i > 0 {
-			sb.WriteString("\n---\n") // Start of FM
+			sb.WriteString("\n---\n")
 
-			// Layout handling for subsequent slides
 			if slide.Layout == "split-image-right" {
 				sb.WriteString("layout: image-right\n")
 				img := slide.Image
@@ -333,42 +349,45 @@ func (p *PPTSubagent) generateSlidevMarkdown(slides []Slide) string {
 					img = fmt.Sprintf("https://picsum.photos/800/600?random=%d", i)
 				}
 				sb.WriteString(fmt.Sprintf("image: %s\n", img))
+				sb.WriteString("class: text-white\n")
 			} else if slide.Layout == "title-center" {
 				sb.WriteString("layout: center\n")
-				sb.WriteString("class: text-center\n")
+				sb.WriteString("class: text-center text-white\n")
 			} else if slide.Layout == "two-cols" {
 				sb.WriteString("layout: two-cols\n")
+				sb.WriteString("class: text-white\n")
 			} else {
 				sb.WriteString("layout: default\n")
+				sb.WriteString("class: text-white\n")
 			}
-
-			sb.WriteString("---\n\n") // End of FM
+			sb.WriteString("---\n\n")
 		}
 
-		// Content
-		sb.WriteString(fmt.Sprintf("# %s\n\n", slide.Title))
+		// Title with Gradient
+		sb.WriteString(fmt.Sprintf("# <span class=\"bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent\">%s</span>\n\n", slide.Title))
 
-		// Handle two-column layout content splitting
+		// Content Wrapper with Glassmorphism and Animation
+		sb.WriteString("<div class=\"bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 shadow-2xl mt-4\" v-motion :initial=\"{ y: 30, opacity: 0 }\" :enter=\"{ y: 0, opacity: 1, transition: { duration: 500 } }\">\n\n")
+
 		if slide.Layout == "two-cols" && len(slide.Content) > 1 {
 			half := len(slide.Content) / 2
 
-			// Left column
 			sb.WriteString("<v-clicks>\n\n")
 			for _, item := range slide.Content[:half] {
 				sb.WriteString(fmt.Sprintf("- %s\n", item))
 			}
 			sb.WriteString("\n</v-clicks>\n\n")
 
-			sb.WriteString("::right::\n\n")
+			sb.WriteString("</div>\n") // Close left wrapper
+			sb.WriteString("::right::\n")
+			sb.WriteString("<div class=\"bg-black/40 backdrop-blur-md p-6 rounded-xl border border-white/10 shadow-2xl mt-4\" v-motion :initial=\"{ y: 30, opacity: 0 }\" :enter=\"{ y: 0, opacity: 1, transition: { duration: 500, delay: 200 } }\">\n\n")
 
-			// Right column
 			sb.WriteString("<v-clicks>\n\n")
 			for _, item := range slide.Content[half:] {
 				sb.WriteString(fmt.Sprintf("- %s\n", item))
 			}
 			sb.WriteString("\n</v-clicks>\n")
 		} else {
-			// Standard content with progressive reveal
 			if len(slide.Content) > 0 {
 				sb.WriteString("<v-clicks>\n\n")
 				for _, item := range slide.Content {
@@ -378,7 +397,9 @@ func (p *PPTSubagent) generateSlidevMarkdown(slides []Slide) string {
 			}
 		}
 
-		// Add presenter notes
+		sb.WriteString("\n</div>\n") // Close main wrapper
+
+		// Presenter Notes
 		sb.WriteString("\n<!--\n")
 		sb.WriteString(fmt.Sprintf("Presenter note for slide %d: %s\n", i+1, slide.Title))
 		sb.WriteString("-->\n")
