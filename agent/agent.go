@@ -355,29 +355,6 @@ func (a *PlanningAgent) Run(ctx context.Context, userRequest string) (string, er
 	return finalOutput, nil
 }
 
-// RunInteractive is similar to Run but maintains conversation history.
-func (a *PlanningAgent) RunInteractive(ctx context.Context, userRequest string) (string, error) {
-	// Add user message to history
-	a.messages = append(a.messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleUser,
-		Content: userRequest,
-	})
-
-	// For interactive mode, we run the same planning logic
-	result, err := a.Run(ctx, userRequest)
-	if err != nil {
-		return "", err
-	}
-
-	// Add assistant response to history
-	a.messages = append(a.messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleAssistant,
-		Content: result,
-	})
-
-	return result, nil
-}
-
 // AddUserMessage adds a user message to the conversation history.
 func (a *PlanningAgent) AddUserMessage(content string) {
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
