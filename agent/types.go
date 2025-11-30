@@ -48,10 +48,6 @@ type InteractionHandler interface {
 	// Returns the modified plan description (if changed) or empty string if approved.
 	ReviewPlan(plan *Plan) (string, error)
 
-	// ReviewSearchResults asks the user if they want to search for more information.
-	// Returns true if more results are requested.
-	ReviewSearchResults(results string) (bool, error)
-
 	// ConfirmPodcastGeneration asks the user if they want to generate a podcast from the report.
 	// Returns true if confirmed.
 	ConfirmPodcastGeneration(report string) (bool, error)

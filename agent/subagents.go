@@ -71,50 +71,100 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 				Error:    err.Error(),
 			}, err
 		}
-	} else {
-		// Human-in-the-loop: Ask if user wants more results
-		if s.interactionHandler != nil {
-			wantMore, err := s.interactionHandler.ReviewSearchResults(searchResult)
-			if err == nil && wantMore {
-				if s.verbose {
-					fmt.Println("  🔄 用户请求更多结果。正在搜索最多 50 条结果...")
-				}
-				moreResults, err := tool.TavilySearchWithLimit(query, 50)
-				if err == nil {
-					searchResult = moreResults
-					if s.verbose {
-						preview := moreResults
-						if len(preview) > 500 {
-							preview = preview[:500] + "..."
-						}
-						fmt.Printf("  🔎 新结果预览:\n%s\n", preview)
-					}
-				} else {
-					if s.verbose {
-						fmt.Printf("  ⚠️ 获取更多结果失败: %v。保留原始结果。\n", err)
-					}
-				}
+	}
+
+	// Reflection Loop
+	maxIterations := 3
+	accumulatedResults := searchResult
+
+	for i := 0; i < maxIterations; i++ {
+		// Prepare prompt for reflection
+		reflectionPrompt := fmt.Sprintf(`用户查询: %s
+当前搜索结果:
+%s
+
+信息是否足以回答用户的查询？
+如果是，请仅回复 "SUFFICIENT"。
+如果否，请回复一个新的、更精细的搜索查询以查找缺失的信息。不要添加任何其他文本。`, query, accumulatedResults)
+
+		// Truncate if too long to avoid context limit issues
+		if len(reflectionPrompt) > 80000 {
+			reflectionPrompt = reflectionPrompt[:80000] + "\n...(truncated)"
+		}
+
+		resp, err := s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+			Model: s.model,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "你是一个搜索优化助手。你评估搜索结果并决定是否需要更多信息。",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: reflectionPrompt,
+				},
+			},
+			Temperature: 0.1, // Low temp for decision making
+		})
+
+		if err != nil {
+			if s.verbose {
+				fmt.Printf("  ⚠️ 反思失败: %v\n", err)
 			}
+			break // Stop reflection if LLM fails
+		}
+
+		decision := strings.TrimSpace(resp.Choices[0].Message.Content)
+
+		// Check if sufficient (case-insensitive check for robustness)
+		if strings.Contains(strings.ToUpper(decision), "SUFFICIENT") {
+			if s.verbose {
+				fmt.Println("  ✓ LLM 认为信息已充足。")
+			}
+			break
+		}
+
+		// It's a new query
+		newQuery := decision
+		// Clean up quotes if present
+		newQuery = strings.Trim(newQuery, "\"'")
+
+		if s.verbose {
+			fmt.Printf("  � LLM 请求更多信息。新查询: %q\n", newQuery)
+		}
+		if s.interactionHandler != nil {
+			s.interactionHandler.Log(fmt.Sprintf("🔄 补充搜索: %s", newQuery))
+		}
+
+		// Execute new search
+		newResults, err := tool.TavilySearch(newQuery)
+		if err != nil {
+			// Try DDG fallback
+			newResults, err = tool.DuckDuckGoSearch(newQuery)
+		}
+
+		if err == nil {
+			accumulatedResults += "\n\n--- Additional Search Results ---\n" + newResults
 		}
 	}
 
 	// Also try Wikipedia if results are sparse (optional, keeping existing logic)
 	wikiResult, wikiErr := tool.WikipediaSearch(query)
 	if wikiErr == nil && wikiResult != "" {
-		searchResult = fmt.Sprintf("网络搜索结果:\n%s\n\n维基百科结果:\n%s", searchResult, wikiResult)
+		accumulatedResults = fmt.Sprintf("网络搜索结果:\n%s\n\n维基百科结果:\n%s", accumulatedResults, wikiResult)
 	}
 
 	if s.verbose {
-		fmt.Printf("\n  ✓ 已检索信息 (%d 字节)\n", len(searchResult))
+		fmt.Printf("\n  ✓ 已检索信息 (%d 字节)\n", len(accumulatedResults))
 	}
 	if s.interactionHandler != nil {
-		s.interactionHandler.Log(fmt.Sprintf("✓ 已检索信息 (%d 字节)", len(searchResult)))
+		s.interactionHandler.Log(fmt.Sprintf("✓ 已检索信息 (%d 字节)", len(accumulatedResults)))
 	}
 
 	return Result{
 		TaskType: TaskTypeSearch,
 		Success:  true,
-		Output:   searchResult,
+		Output:   accumulatedResults,
 		Metadata: map[string]interface{}{
 			"query": query,
 		},

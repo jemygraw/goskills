@@ -61,21 +61,6 @@ func (h *WebInteractionHandler) ReviewPlan(plan *agent.Plan) (string, error) {
 	return response, nil
 }
 
-func (h *WebInteractionHandler) ReviewSearchResults(results string) (bool, error) {
-	// Filter out "Content: ..." lines to keep the display clean
-	var filteredLines []string
-	lines := strings.Split(results, "\n")
-	for _, line := range lines {
-		if !strings.HasPrefix(strings.TrimSpace(line), "Content:") {
-			filteredLines = append(filteredLines, line)
-		}
-	}
-	cleanResults := strings.Join(filteredLines, "\n")
-
-	h.Log(fmt.Sprintf("🔎 Search Results:\n%s", cleanResults))
-	return false, nil
-}
-
 func (h *WebInteractionHandler) ConfirmPodcastGeneration(report string) (bool, error) {
 	// Auto-approve for web interface
 	return true, nil

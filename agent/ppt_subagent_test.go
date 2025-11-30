@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +41,7 @@ func TestGenerateAndBuild(t *testing.T) {
 
 	// Run GenerateAndBuild
 	fmt.Println("Starting GenerateAndBuild test...")
-	url, err := agent.GenerateAndBuild(slides)
+	url, err := agent.GenerateAndBuild(context.Background(), slides)
 	if err != nil {
 		t.Fatalf("GenerateAndBuild failed: %v", err)
 	}

@@ -47,24 +47,6 @@ func (h *CLIInteractionHandler) ReviewPlan(plan *agent.Plan) (string, error) {
 	return input, nil
 }
 
-func (h *CLIInteractionHandler) ReviewSearchResults(results string) (bool, error) {
-	// Show a preview of results
-	preview := results
-	if len(preview) > 500 {
-		preview = preview[:500] + "..."
-	}
-	count := strings.Count(results, "URL: ")
-	fmt.Printf("\n🔎 Search Results Preview (%d results):\n%s\n\n", count, preview)
-
-	fmt.Print("\033[1;33mDo you want to search for more results (up to 100)? (y/N):\033[0m ")
-	if !h.scanner.Scan() {
-		return false, h.scanner.Err()
-	}
-	input := strings.TrimSpace(h.scanner.Text())
-
-	return strings.EqualFold(input, "y") || strings.EqualFold(input, "yes"), nil
-}
-
 func (h *CLIInteractionHandler) ConfirmPodcastGeneration(report string) (bool, error) {
 	fmt.Print("\n\033[1;33mDo you want to generate a podcast from this report? (y/N):\033[0m ")
 	if !h.scanner.Scan() {
