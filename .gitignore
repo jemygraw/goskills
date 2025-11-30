@@ -37,6 +37,7 @@ agent-cli
 !agent-cli/
 agent-web
 !agent-web/
+sessions
 
 generated
 
