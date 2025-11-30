@@ -34,28 +34,38 @@ var (
 type WebInteractionHandler struct {
 	eventChan    chan Event
 	responseChan chan string
+	events       []Event
+	mu           sync.Mutex
+	sessionID    string
+	userRequest  string
 }
 
 type Event struct {
-	Type    string      `json:"type"`
-	Content string      `json:"content,omitempty"`
-	Plan    *agent.Plan `json:"plan,omitempty"`
-	Podcast interface{} `json:"podcast,omitempty"`
-	PPT     string      `json:"ppt,omitempty"`
+	Type      string      `json:"type"`
+	Content   string      `json:"content,omitempty"`
+	Plan      *agent.Plan `json:"plan,omitempty"`
+	Podcast   interface{} `json:"podcast,omitempty"`
+	PPT       string      `json:"ppt,omitempty"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
-func NewWebInteractionHandler() *WebInteractionHandler {
+func NewWebInteractionHandler(sessionID, userRequest string) *WebInteractionHandler {
 	return &WebInteractionHandler{
 		eventChan:    make(chan Event, 100),
 		responseChan: make(chan string),
+		events:       make([]Event, 0),
+		sessionID:    sessionID,
+		userRequest:  userRequest,
 	}
 }
 
 func (h *WebInteractionHandler) ReviewPlan(plan *agent.Plan) (string, error) {
-	h.eventChan <- Event{
-		Type: "plan_review",
-		Plan: plan,
+	event := Event{
+		Type:      "plan_review",
+		Plan:      plan,
+		Timestamp: time.Now(),
 	}
+	h.Broadcast(event)
 	// Wait for user response
 	response := <-h.responseChan
 	return response, nil
@@ -67,14 +77,86 @@ func (h *WebInteractionHandler) ConfirmPodcastGeneration(report string) (bool, e
 }
 
 func (h *WebInteractionHandler) Log(message string) {
-	h.eventChan <- Event{
-		Type:    "log",
-		Content: message,
-	}
+	h.Broadcast(Event{
+		Type:      "log",
+		Content:   message,
+		Timestamp: time.Now(),
+	})
 }
 
 func (h *WebInteractionHandler) Broadcast(event Event) {
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now()
+	}
+
+	h.mu.Lock()
+	h.events = append(h.events, event)
+	h.mu.Unlock()
+
 	h.eventChan <- event
+
+	if event.Type == "done" {
+		h.SaveSession()
+	}
+}
+
+func (h *WebInteractionHandler) SaveSession() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if len(h.events) == 0 {
+		return
+	}
+
+	// Do not save session if request is /clear
+	if strings.TrimSpace(h.userRequest) == "/clear" {
+		return
+	}
+
+	// Create sessions directory if not exists
+	if err := os.MkdirAll("sessions", 0755); err != nil {
+		log.Printf("Failed to create sessions directory: %v", err)
+		return
+	}
+
+	// Sanitize user request for filename
+	safeRequest := sanitizeFilename(h.userRequest)
+
+	// Truncate to first 50 chars (rune-aware)
+	runes := []rune(safeRequest)
+	if len(runes) > 50 {
+		safeRequest = string(runes[:50])
+	}
+
+	// Ensure filename is not empty
+	if safeRequest == "" {
+		safeRequest = h.sessionID
+	}
+
+	// Append session ID to ensure uniqueness
+	filename := fmt.Sprintf("sessions/%s-%s.json", safeRequest, h.sessionID)
+
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Printf("Failed to create session file: %v", err)
+		return
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(h.events); err != nil {
+		log.Printf("Failed to save session: %v", err)
+	}
+}
+
+func sanitizeFilename(name string) string {
+	// Replace invalid characters with underscore
+	invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
+	for _, char := range invalid {
+		name = strings.ReplaceAll(name, char, "_")
+	}
+	return strings.TrimSpace(name)
 }
 
 // Session represents a user session
@@ -112,7 +194,7 @@ func (sm *SessionManager) CreateSession(id string, config agent.AgentConfig) (*S
 		return session, nil
 	}
 
-	handler := NewWebInteractionHandler()
+	handler := NewWebInteractionHandler(id, "")
 	planningAgent, err := agent.NewPlanningAgent(config, handler)
 	if err != nil {
 		return nil, err
@@ -253,6 +335,11 @@ func runServer(cmd *cobra.Command, args []string) {
 
 		planningAgent := session.Agent
 		handler := session.Handler
+
+		// Update user request in handler for filename generation
+		session.Handler.mu.Lock()
+		session.Handler.userRequest = req.Message
+		session.Handler.mu.Unlock()
 
 		// Run agent in a goroutine
 		go func() {
@@ -398,6 +485,62 @@ func runServer(cmd *cobra.Command, args []string) {
 			"ppt":     ppt,
 			"podcast": podcast,
 		})
+	})
+
+	http.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
+		entries, err := os.ReadDir("sessions")
+		if err != nil {
+			// If directory doesn't exist, return empty list
+			if os.IsNotExist(err) {
+				json.NewEncoder(w).Encode([]string{})
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var sessions []map[string]interface{}
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+				info, err := entry.Info()
+				if err != nil {
+					continue
+				}
+				sessions = append(sessions, map[string]interface{}{
+					"id":        strings.TrimSuffix(entry.Name(), ".json"),
+					"timestamp": info.ModTime(),
+				})
+			}
+		}
+
+		// Sort by timestamp desc
+		// (Simple bubble sort or just leave it to frontend, but let's do it here for convenience if needed,
+		// actually let's just return the list and let frontend sort or just return as is)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(sessions)
+	})
+
+	http.HandleFunc("/api/replay", func(w http.ResponseWriter, r *http.Request) {
+		sessionID := r.URL.Query().Get("session_id")
+		if sessionID == "" {
+			http.Error(w, "Session ID required", http.StatusBadRequest)
+			return
+		}
+
+		filename := fmt.Sprintf("sessions/%s.json", sessionID)
+		data, err := os.ReadFile(filename)
+		if err != nil {
+			if os.IsNotExist(err) {
+				http.Error(w, "Session not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
 	})
 
 	fmt.Printf("Starting server on http://%s\n", addr)

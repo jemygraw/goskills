@@ -7,10 +7,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let eventSource = null;
     let currentTaskIndex = -1;
     let tasks = [];
+    let isReplaying = false;
 
-    // Generate unique session ID
-    const sessionId = 'session-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
-    console.log('Session ID:', sessionId);
+    // Current Session ID
+    let sessionId = '';
+
+    function generateSessionId() {
+        sessionId = 'session-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+        console.log('New Session ID:', sessionId);
+    }
+
+    // Generate initial session ID
+    generateSessionId();
 
     // Auto-resize textarea
     userInput.addEventListener('input', function () {
@@ -45,8 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => console.error('Failed to load config:', err));
 
-    // ... (existing code)
-
     // Handle form submission
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -54,6 +60,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!text) return;
 
         setLoading(true);
+
+        // Generate a new session ID for every request to ensure independence
+        generateSessionId();
+
+        // Close existing SSE connection if any, to ensure we connect to the new session
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
 
         // Append instructions based on checkboxes
         if (pptCheckbox.checked) {
@@ -92,9 +107,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error('网络响应不正常');
             }
 
-            if (!eventSource) {
-                connectSSE();
-            }
+            // Always connect SSE for the new session
+            connectSSE();
 
         } catch (error) {
             console.error('Error:', error);
@@ -104,6 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function connectSSE() {
+        if (eventSource) {
+            eventSource.close();
+        }
         eventSource = new EventSource(`/events?session_id=${sessionId}`);
 
         eventSource.onmessage = (event) => {
@@ -112,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         eventSource.onerror = (error) => {
-            console.error('SSE Error:', error);
+            // console.error('SSE Error:', error);
             eventSource.close();
             eventSource = null;
         };
@@ -270,14 +287,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 terminalContainer.scrollTop = terminalContainer.scrollHeight;
                 break;
             case 'plan_review':
-                showPlanReview(data.plan);
+                if (isReplaying) {
+                    renderPlan(data.plan);
+                    addLog('system', '计划已在回放中自动确认。');
+                } else {
+                    showPlanReview(data.plan);
+                }
                 break;
             case 'error':
                 addLog('error', data.content);
                 setLoading(false);
                 break;
             case 'done':
-                addLog('success', '任务完成。');
+                addLog('success', '任务已完成！');
+                // Refresh history sessions list to include the new session
+                setTimeout(loadHistorySessions, 1000); // Small delay to ensure backend has saved the file
                 setLoading(false);
                 break;
         }
@@ -559,6 +583,148 @@ document.addEventListener('DOMContentLoaded', () => {
             sendBtn.style.cursor = 'pointer';
             userInput.focus();
         }
+    }
+
+    // Load history sessions on startup
+    loadHistorySessions();
+
+    function loadHistorySessions() {
+        const container = document.getElementById('history-sessions-list');
+        if (!container) return;
+
+        fetch('/api/sessions')
+            .then(res => res.json())
+            .then(sessions => {
+                container.innerHTML = '';
+                if (sessions.length === 0) {
+                    container.innerHTML = '<div style="color: #666; font-size: 0.9rem;">暂无历史会话</div>';
+                    return;
+                }
+
+                // Sort by timestamp desc
+                sessions.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                sessions.forEach(session => {
+                    const card = document.createElement('div');
+                    card.className = 'history-session-card';
+
+                    // Extract user request from ID
+                    // Format: sanitized_request-session_id
+                    // We want everything before the last "-session-"
+                    let displayTitle = session.id;
+                    const sessionIndex = session.id.lastIndexOf('-session-');
+                    if (sessionIndex !== -1) {
+                        const requestPart = session.id.substring(0, sessionIndex);
+                        displayTitle = requestPart.replace(/_/g, ' ');
+                    }
+
+                    if (!displayTitle || displayTitle.length === 0) {
+                        displayTitle = session.id;
+                    }
+
+                    const date = new Date(session.timestamp).toLocaleDateString();
+
+                    card.innerHTML = `
+                        <div class="history-session-title" title="${displayTitle}">${displayTitle}</div>
+                        <div class="history-session-date"><i class="far fa-clock"></i> ${date}</div>
+                    `;
+
+                    card.addEventListener('click', () => {
+                        replaySession(session.id);
+                        // Scroll to top to see replay
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    });
+
+                    container.appendChild(card);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load sessions:', err);
+                container.innerHTML = '<div style="color: red;">加载失败</div>';
+            });
+    }
+
+    function replaySession(sessionId) {
+        isReplaying = true;
+        // Clear current state
+        planContainer.innerHTML = '<div class="empty-state">Replaying session...</div>';
+        terminalContainer.innerHTML = '';
+        currentTaskIndex = -1;
+        tasks = [];
+
+        // Remove all report/podcast tabs except terminal
+        document.querySelectorAll('.tab').forEach(tab => {
+            if (tab.dataset.tab !== 'terminal') {
+                closeReportTab(tab.dataset.tab);
+            }
+        });
+        activateTab('terminal');
+
+        // Extract display title for log
+        let displayTitle = sessionId;
+        const sessionIndex = sessionId.lastIndexOf('-session-');
+        if (sessionIndex !== -1) {
+            const requestPart = sessionId.substring(0, sessionIndex);
+            displayTitle = requestPart.replace(/_/g, ' ');
+        }
+        addLog('system', `> 开始回放会话: ${displayTitle}`);
+
+        fetch(`/api/replay?session_id=${sessionId}`)
+            .then(res => res.json())
+            .then(events => {
+                if (!Array.isArray(events)) {
+                    throw new Error('Invalid session data');
+                }
+
+                if (events.length === 0) {
+                    addLog('system', '> 会话数据为空');
+                    isReplaying = false;
+                    return;
+                }
+
+                // Sort events by timestamp to ensure correct order
+                events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                // Calculate relative delays
+                const startTime = new Date(events[0].timestamp).getTime();
+
+                let i = 0;
+                function playNext() {
+                    if (i >= events.length) {
+                        // addLog('system', '> 回放结束');
+                        isReplaying = false;
+                        return;
+                    }
+
+                    const event = events[i];
+                    handleEvent(event);
+
+                    i++;
+                    if (i < events.length) {
+                        const nextEvent = events[i];
+                        const currentEventTime = new Date(event.timestamp).getTime();
+                        const nextEventTime = new Date(nextEvent.timestamp).getTime();
+
+                        // Calculate delay, cap at 2 seconds to avoid waiting too long for long pauses
+                        let delay = nextEventTime - currentEventTime;
+                        if (delay < 0) delay = 0;
+                        if (delay > 2000) delay = 2000; // Max 2s delay
+                        if (delay < 100) delay = 100;   // Min 100ms delay for visual flow
+
+                        setTimeout(playNext, delay);
+                    } else {
+                        // addLog('system', '> 回放结束');
+                        isReplaying = false;
+                    }
+                }
+
+                // Start playback
+                playNext();
+            })
+            .catch(err => {
+                addLog('error', `回放失败: ${err.message}`);
+                isReplaying = false;
+            });
     }
 
 });

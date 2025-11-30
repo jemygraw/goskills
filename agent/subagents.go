@@ -55,6 +55,9 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 	if s.verbose {
 		fmt.Printf("  查询: %q\n", query)
 	}
+	if s.interactionHandler != nil {
+		s.interactionHandler.Log(fmt.Sprintf("  查询: %q", query))
+	}
 
 	// Perform Tavily search
 	searchResult, err := tool.TavilySearch(query)
@@ -62,6 +65,9 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 		// Fallback to DuckDuckGo if Tavily fails (e.g. missing key)
 		if s.verbose {
 			fmt.Printf("  ⚠️ Tavily 搜索失败: %v。回退到 DuckDuckGo。\n", err)
+		}
+		if s.interactionHandler != nil {
+			s.interactionHandler.Log(fmt.Sprintf("  ⚠️ Tavily 搜索失败: %v。回退到 DuckDuckGo。", err))
 		}
 		searchResult, err = tool.DuckDuckGoSearch(query)
 		if err != nil {
@@ -111,6 +117,9 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 			if s.verbose {
 				fmt.Printf("  ⚠️ 反思失败: %v\n", err)
 			}
+			if s.interactionHandler != nil {
+				s.interactionHandler.Log(fmt.Sprintf("  ⚠️ 反思失败: %v", err))
+			}
 			break // Stop reflection if LLM fails
 		}
 
@@ -121,6 +130,9 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 			if s.verbose {
 				fmt.Println("  ✓ LLM 认为信息已充足。")
 			}
+			if s.interactionHandler != nil {
+				s.interactionHandler.Log("  ✓ LLM 认为信息已充足。")
+			}
 			break
 		}
 
@@ -130,7 +142,10 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 		newQuery = strings.Trim(newQuery, "\"'")
 
 		if s.verbose {
-			fmt.Printf("  � LLM 请求更多信息。新查询: %q\n", newQuery)
+			fmt.Printf("  🔄 LLM 请求更多信息。新查询: %q\n", newQuery)
+		}
+		if s.interactionHandler != nil {
+			s.interactionHandler.Log(fmt.Sprintf("  🔄 LLM 请求更多信息。新查询: %q", newQuery))
 		}
 		if s.interactionHandler != nil {
 			s.interactionHandler.Log(fmt.Sprintf("🔄 补充搜索: %s", newQuery))
@@ -154,11 +169,41 @@ func (s *SearchSubagent) Execute(ctx context.Context, task Task) (Result, error)
 		accumulatedResults = fmt.Sprintf("网络搜索结果:\n%s\n\n维基百科结果:\n%s", accumulatedResults, wikiResult)
 	}
 
+	// Parse and log simplified results
+	var resultLog strings.Builder
+	resultLog.WriteString("已检索信息:\n")
+
+	// Simple parsing of the text format returned by TavilySearch
+	// Format: Title: ...\nURL: ...\nContent: ...\n\n
+	entries := strings.Split(accumulatedResults, "\n\n")
+	for _, entry := range entries {
+		if strings.TrimSpace(entry) == "" {
+			continue
+		}
+		lines := strings.Split(entry, "\n")
+		var title, url string
+		for _, line := range lines {
+			if strings.HasPrefix(line, "Title: ") {
+				title = strings.TrimPrefix(line, "Title: ")
+			} else if strings.HasPrefix(line, "URL: ") {
+				url = strings.TrimPrefix(line, "URL: ")
+			}
+		}
+		if title != "" && url != "" {
+			resultLog.WriteString(fmt.Sprintf("- [%s](%s)\n", title, url))
+		}
+	}
+
+	logContent := resultLog.String()
+	if len([]rune(logContent)) > 200 {
+		logContent = string([]rune(logContent)[:200]) + "..."
+	}
+
 	if s.verbose {
-		fmt.Printf("\n  ✓ 已检索信息 (%d 字节)\n", len(accumulatedResults))
+		fmt.Printf("\n  ✓ %s\n", logContent)
 	}
 	if s.interactionHandler != nil {
-		s.interactionHandler.Log(fmt.Sprintf("✓ 已检索信息 (%d 字节)", len(accumulatedResults)))
+		s.interactionHandler.Log(fmt.Sprintf("✓ %s", logContent))
 	}
 
 	return Result{
