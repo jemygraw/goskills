@@ -233,7 +233,10 @@ func (a *PlanningAgent) Execute(ctx context.Context, plan *Plan) ([]Result, erro
 
 	var contextData []string
 
-	for i, task := range plan.Tasks {
+	// Use a loop index that can be modified to support dynamic task insertion
+	for i := 0; i < len(plan.Tasks); i++ {
+		task := plan.Tasks[i]
+
 		if a.config.Verbose {
 			fmt.Printf("📍 步骤 %d/%d: [%s] %s\n", i+1, len(plan.Tasks), task.Type, task.Description)
 		}
@@ -279,6 +282,22 @@ func (a *PlanningAgent) Execute(ctx context.Context, plan *Plan) ([]Result, erro
 		results = append(results, result)
 
 		if result.Success {
+			// Check for dynamic tasks
+			if len(result.NewTasks) > 0 {
+				if a.config.Verbose {
+					fmt.Printf("  🔄 动态规划更新: 插入 %d 个新任务\n", len(result.NewTasks))
+				}
+				if a.interactionHandler != nil {
+					a.interactionHandler.Log(fmt.Sprintf("🔄 动态规划更新: 插入 %d 个新任务", len(result.NewTasks)))
+				}
+
+				// Insert new tasks at the current position + 1
+				// We need to create a new slice to avoid modifying the original plan array in place if it was smaller
+				// But here plan.Tasks is a slice, so we can use append tricks
+				rear := append([]Task{}, plan.Tasks[i+1:]...)
+				plan.Tasks = append(plan.Tasks[:i+1], append(result.NewTasks, rear...)...)
+			}
+
 			// Accumulate output for next tasks
 			contextData = append(contextData, fmt.Sprintf("Output from %s task:\n%s", task.Type, result.Output))
 

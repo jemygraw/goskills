@@ -260,7 +260,11 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 
 	// Check for global context
 	globalContext, _ := task.Parameters["global_context"].(string)
-	systemPrompt := "你是一个分析助手，负责综合和分析信息。请提供清晰、结构化的分析。"
+	systemPrompt := "你是一个分析助手，负责综合和分析信息。请提供清晰、结构化的分析。\n" +
+		"如果提供的信息不足以完成分析，你可以请求更多信息。\n" +
+		"如果需要更多信息，请仅回复 'MISSING_INFO: <具体的搜索查询>'。\n" +
+		"例如: 'MISSING_INFO: 2024年Q3特斯拉财报数据'"
+
 	if globalContext != "" {
 		systemPrompt += "\n\n来自用户的重要上下文/指令：\n" + globalContext
 	}
@@ -293,11 +297,43 @@ func (a *AnalysisSubagent) Execute(ctx context.Context, task Task) (Result, erro
 
 	analysis := resp.Choices[0].Message.Content
 
+	// Check for MISSING_INFO signal
+	if strings.HasPrefix(strings.TrimSpace(analysis), "MISSING_INFO:") {
+		newQuery := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(analysis), "MISSING_INFO:"))
+
+		if a.verbose {
+			fmt.Printf("  🔄 分析发现信息缺失，请求新搜索: %q\n", newQuery)
+		}
+		if a.interactionHandler != nil {
+			a.interactionHandler.Log(fmt.Sprintf("🔄 分析发现信息缺失，请求新搜索: %q", newQuery))
+		}
+
+		// Create new tasks
+		newTasks := []Task{
+			{
+				Type:        TaskTypeSearch,
+				Description: newQuery,
+				Parameters: map[string]interface{}{
+					"query": newQuery,
+				},
+			},
+			// Re-queue the current analysis task to run after the search
+			task,
+		}
+
+		return Result{
+			TaskType: TaskTypeAnalyze,
+			Success:  true, // Step succeeded in identifying need
+			Output:   fmt.Sprintf("正在请求更多信息: %s", newQuery),
+			NewTasks: newTasks,
+		}, nil
+	}
+
 	if a.verbose {
-		fmt.Printf("  ✓ 分析完成 (%d 字节)\n", len(analysis))
+		fmt.Printf("  ✓ 信息这已足够，分析完成 (%d 字节)\n", len(analysis))
 	}
 	if a.interactionHandler != nil {
-		a.interactionHandler.Log(fmt.Sprintf("✓ 分析完成 (%d 字节)", len(analysis)))
+		a.interactionHandler.Log(fmt.Sprintf("✓ 信息这已足够，分析完成 (%d 字节)", len(analysis)))
 	}
 
 	return Result{

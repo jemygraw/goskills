@@ -28,6 +28,7 @@ type Result struct {
 	Output   string                 `json:"output"`
 	Error    string                 `json:"error,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	NewTasks []Task                 `json:"new_tasks,omitempty"`
 }
 
 // Plan represents a collection of tasks with dependencies.
