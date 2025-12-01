@@ -626,7 +626,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     card.innerHTML = `
                         <div class="history-session-title" title="${displayTitle}">${displayTitle}</div>
-                        <div class="history-session-date"><i class="far fa-clock"></i> ${date}</div>
                     `;
 
                     card.addEventListener('click', () => {
