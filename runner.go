@@ -15,9 +15,14 @@ import (
 	"github.com/smallnest/goskills/tool"
 )
 
+// OpenAIChatClient interface for dependency injection and testing
+type OpenAIChatClient interface {
+	CreateChatCompletion(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error)
+}
+
 // Agent manages the skill discovery, selection, and execution process.
 type Agent struct {
-	client    *openai.Client
+	client    OpenAIChatClient
 	cfg       RunnerConfig
 	messages  []openai.ChatCompletionMessage // Stores the conversation history
 	mcpClient *mcp.Client
@@ -184,11 +189,13 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	}
 	sb.WriteString("\nBased on the user request, which single skill is the most appropriate to use? Respond with only the name of the skill.")
 
+	skillPrompt := SkillsToPrompt(skills)
+
 	// Use a temporary message history for skill selection
 	selectionMessages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: "You are an expert assistant that selects the most appropriate skill to handle a user's request. Your response must be only the exact name of the chosen skill, with no other text or explanation.",
+			Content: "You are an expert assistant that selects the most appropriate skill to handle a user's request. \n" + skillPrompt,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
@@ -207,10 +214,37 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 		return "", err
 	}
 
-	skillName := strings.TrimSpace(resp.Choices[0].Message.Content)
-	skillName = strings.Trim(skillName, "'\"")
+	content := strings.TrimSpace(resp.Choices[0].Message.Content)
+	content = strings.Trim(content, "'\"")
+
+	// Extract just the skill name if there's extra text
+	// Look for skill names in the content
+	skillName := extractSkillName(content, skills)
 
 	return skillName, nil
+}
+
+// extractSkillName extracts the skill name from AI response content
+func extractSkillName(content string, skills map[string]SkillPackage) string {
+	// First, check if the content is already a valid skill name
+	if _, exists := skills[content]; exists {
+		return content
+	}
+
+	// Convert content to lowercase for case-insensitive matching
+	lowerContent := strings.ToLower(content)
+
+	// Look for any skill name mentioned in the content
+	for skillName := range skills {
+		// Check exact match (case-insensitive)
+		if strings.Contains(lowerContent, strings.ToLower(skillName)) {
+			return skillName
+		}
+	}
+
+	// If no skill name found, return the original content
+	// This preserves the existing behavior when no skills match
+	return content
 }
 
 // executeSkillWithTools sets up the initial system prompt and starts the tool-use conversation.

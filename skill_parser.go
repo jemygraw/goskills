@@ -187,3 +187,37 @@ func ParseSkillPackages(rootDir string) ([]*SkillPackage, error) {
 
 	return packages, nil
 }
+
+// SkillsToPrompt converts a slice of SkillPackage objects to a prompt string
+func SkillsToPrompt(skills map[string]SkillPackage) string {
+	var builder strings.Builder
+
+	// Add skills instructions header
+	builder.WriteString("<skills_instructions>\n")
+	builder.WriteString("When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively.\n\n")
+
+	builder.WriteString("How to use skills:\n")
+	builder.WriteString("- Invoke skills using this tool with the skill name only (no arguments)\n")
+	builder.WriteString("- When you invoke a skill, you will see <command-message>The \"{name}\" skill is loading</command-message>\n")
+	builder.WriteString("- The skill's prompt will expand and provide detailed instructions on how to complete the task\n\n")
+
+	builder.WriteString("Important:\n")
+	builder.WriteString("- Only use skills listed in <available_skills> below\n")
+	builder.WriteString("- Do not invoke a skill that is already running\n")
+	builder.WriteString("</skills_instructions>\n\n")
+
+	// Add available skills section
+	builder.WriteString("<available_skills>\n")
+
+	for _, skill := range skills {
+		builder.WriteString("<skill>\n")
+		builder.WriteString(fmt.Sprintf("<name>%s</name>\n", skill.Meta.Name))
+		builder.WriteString(fmt.Sprintf("<description>%s</description>\n", skill.Meta.Description))
+		builder.WriteString("<location>plugin</location>\n")
+		builder.WriteString("</skill>\n\n")
+	}
+
+	builder.WriteString("</available_skills>")
+
+	return builder.String()
+}
