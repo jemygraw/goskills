@@ -2,12 +2,43 @@ package goskills
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// MockOpenAIClient is a mock implementation of OpenAIChatClient for testing
+type MockOpenAIClient struct {
+	responses []openai.ChatCompletionResponse
+	callCount int
+	err       error
+}
+
+func (m *MockOpenAIClient) CreateChatCompletion(ctx context.Context, req openai.ChatCompletionRequest) (openai.ChatCompletionResponse, error) {
+	if m.err != nil {
+		return openai.ChatCompletionResponse{}, m.err
+	}
+	if m.callCount >= len(m.responses) {
+		return openai.ChatCompletionResponse{}, fmt.Errorf("no more responses")
+	}
+	resp := m.responses[m.callCount]
+	m.callCount++
+	return resp, nil
+}
+
+// NewMockOpenAIClient creates a new mock client with predefined responses
+func NewMockOpenAIClient(responses []openai.ChatCompletionResponse, err error) *MockOpenAIClient {
+	return &MockOpenAIClient{
+		responses: responses,
+		err:       err,
+	}
+}
 
 // createTestAgent creates an agent for testing using environment variables
 func createTestAgent(t *testing.T) *Agent {
@@ -331,4 +362,746 @@ func TestExtractSkillName(t *testing.T) {
 			assert.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+// TestRun_WithMock tests the Run method with a mock client
+func TestRun_WithMock(t *testing.T) {
+	// Create a temporary test skills directory
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	require.NoError(t, os.MkdirAll(skillDir, 0755))
+
+	// Create a simple SKILL.md file (must be uppercase)
+	skillContent := `---
+name: test-skill
+description: A test skill
+---
+This is a test skill.`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644))
+
+	// Create mock responses
+	mockResponses := []openai.ChatCompletionResponse{
+		{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: "test-skill",
+					},
+				},
+			},
+		},
+		{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: "This is the final response",
+					},
+				},
+			},
+		},
+	}
+
+	mockClient := NewMockOpenAIClient(mockResponses, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			SkillsDir:        tmpDir,
+			Verbose:          false,
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	result, err := agent.Run(context.Background(), "test prompt")
+	assert.NoError(t, err)
+	assert.Equal(t, "This is the final response", result)
+}
+
+// TestSelectAndPrepareSkill tests the selectAndPrepareSkill method
+func TestSelectAndPrepareSkill(t *testing.T) {
+	// Create a temporary test skills directory
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	require.NoError(t, os.MkdirAll(skillDir, 0755))
+
+	// Create a simple SKILL.md file (must be uppercase)
+	skillContent := `---
+name: test-skill
+description: A test skill for testing
+---
+This is a test skill body.`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644))
+
+	// Create mock response for skill selection
+	mockResponse := openai.ChatCompletionResponse{
+		Choices: []openai.ChatCompletionChoice{
+			{
+				Message: openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: "test-skill",
+				},
+			},
+		},
+	}
+
+	mockClient := NewMockOpenAIClient([]openai.ChatCompletionResponse{mockResponse}, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:     "test-model",
+			SkillsDir: tmpDir,
+			Verbose:   false,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill, err := agent.selectAndPrepareSkill(context.Background(), "test prompt")
+	assert.NoError(t, err)
+	assert.NotNil(t, skill)
+	assert.Equal(t, "test-skill", skill.Meta.Name)
+}
+
+// TestSelectAndPrepareSkill_NoSkills tests error when no skills are found
+func TestSelectAndPrepareSkill_NoSkills(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	mockClient := NewMockOpenAIClient([]openai.ChatCompletionResponse{}, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:     "test-model",
+			SkillsDir: tmpDir,
+			Verbose:   false,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill, err := agent.selectAndPrepareSkill(context.Background(), "test prompt")
+	assert.Error(t, err)
+	assert.Nil(t, skill)
+	assert.Contains(t, err.Error(), "no valid skills found")
+}
+
+// TestExecuteToolCall_RunShellCode tests executeToolCall for shell code execution
+func TestExecuteToolCall_RunShellCode(t *testing.T) {
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	argsJSON := `{"code": "echo 'hello'", "args": {}}`
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_shell_code",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "hello")
+}
+
+// TestExecuteToolCall_ReadFile tests executeToolCall for reading files
+func TestExecuteToolCall_ReadFile(t *testing.T) {
+	// Create a temporary file
+	tmpFile := filepath.Join(t.TempDir(), "test.txt")
+	testContent := "test file content"
+	require.NoError(t, os.WriteFile(tmpFile, []byte(testContent), 0644))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	argsJSON := fmt.Sprintf(`{"filePath": "%s"}`, tmpFile)
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "read_file",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, testContent)
+}
+
+// TestExecuteToolCall_WriteFile tests executeToolCall for writing files
+func TestExecuteToolCall_WriteFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "output.txt")
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	testContent := "written content"
+	argsJSON := fmt.Sprintf(`{"filePath": "%s", "content": "%s"}`, tmpFile, testContent)
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "write_file",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "Successfully wrote to file")
+
+	// Verify file was created
+	content, err := os.ReadFile(tmpFile)
+	assert.NoError(t, err)
+	assert.Equal(t, testContent, string(content))
+}
+
+// TestExecuteToolCall_UnknownTool tests error handling for unknown tools
+func TestExecuteToolCall_UnknownTool(t *testing.T) {
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "unknown_tool",
+			Arguments: "{}",
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.Error(t, err)
+	assert.Empty(t, output)
+	assert.Contains(t, err.Error(), "unknown tool")
+}
+
+// TestExecuteToolCall_InvalidJSON tests error handling for invalid JSON arguments
+func TestExecuteToolCall_InvalidJSON(t *testing.T) {
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "read_file",
+			Arguments: "invalid json",
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.Error(t, err)
+	assert.Empty(t, output)
+	assert.Contains(t, err.Error(), "failed to unmarshal")
+}
+
+// TestExecuteSkillWithTools tests executeSkillWithTools method
+func TestExecuteSkillWithTools(t *testing.T) {
+	// Create mock response without tool calls (final response)
+	mockResponse := openai.ChatCompletionResponse{
+		Choices: []openai.ChatCompletionChoice{
+			{
+				Message: openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: "Final response",
+				},
+			},
+		},
+	}
+
+	mockClient := NewMockOpenAIClient([]openai.ChatCompletionResponse{mockResponse}, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill := SkillPackage{
+		Meta: SkillMeta{
+			Name:        "test",
+			Description: "test skill",
+		},
+		Body: "Test skill body",
+		Path: "/test/path",
+	}
+
+	result, err := agent.executeSkillWithTools(context.Background(), "test prompt", skill)
+	assert.NoError(t, err)
+	assert.Equal(t, "Final response", result)
+}
+
+// TestContinueSkillWithTools_WithToolCalls tests continueSkillWithTools with tool execution
+func TestContinueSkillWithTools_WithToolCalls(t *testing.T) {
+	// Create a temp file for the read_file tool
+	tmpFile := filepath.Join(t.TempDir(), "test.txt")
+	require.NoError(t, os.WriteFile(tmpFile, []byte("test content"), 0644))
+
+	// First response with tool call
+	argsJSON, _ := json.Marshal(map[string]string{"filePath": tmpFile})
+	mockResponse1 := openai.ChatCompletionResponse{
+		Choices: []openai.ChatCompletionChoice{
+			{
+				Message: openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: "",
+					ToolCalls: []openai.ToolCall{
+						{
+							ID:   "call-1",
+							Type: openai.ToolTypeFunction,
+							Function: openai.FunctionCall{
+								Name:      "read_file",
+								Arguments: string(argsJSON),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Second response without tool calls (final)
+	mockResponse2 := openai.ChatCompletionResponse{
+		Choices: []openai.ChatCompletionChoice{
+			{
+				Message: openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: "File content processed",
+				},
+			},
+		},
+	}
+
+	mockClient := NewMockOpenAIClient([]openai.ChatCompletionResponse{mockResponse1, mockResponse2}, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill := SkillPackage{
+		Meta: SkillMeta{
+			Name: "test",
+		},
+		Body: "Test",
+		Path: "/test",
+	}
+
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	assert.NoError(t, err)
+	assert.Equal(t, "File content processed", result)
+}
+
+// TestContinueSkillWithTools_MaxIterations tests that the function stops after max iterations
+func TestContinueSkillWithTools_MaxIterations(t *testing.T) {
+	// Create responses that always return tool calls (infinite loop scenario)
+	mockResponses := make([]openai.ChatCompletionResponse, 15)
+	for i := range mockResponses {
+		mockResponses[i] = openai.ChatCompletionResponse{
+			Choices: []openai.ChatCompletionChoice{
+				{
+					Message: openai.ChatCompletionMessage{
+						Role:    openai.ChatMessageRoleAssistant,
+						Content: "",
+						ToolCalls: []openai.ToolCall{
+							{
+								ID:   fmt.Sprintf("call-%d", i),
+								Type: openai.ToolTypeFunction,
+								Function: openai.FunctionCall{
+									Name:      "run_shell_code",
+									Arguments: `{"code": "echo test", "args": {}}`,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	mockClient := NewMockOpenAIClient(mockResponses, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill := SkillPackage{
+		Meta: SkillMeta{Name: "test"},
+		Body: "Test",
+		Path: "/test",
+	}
+
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeded maximum tool call iterations")
+	assert.Empty(t, result)
+}
+
+// TestDiscoverSkills_RealDirectory tests discoverSkills with testdata
+func TestDiscoverSkills_RealDirectory(t *testing.T) {
+	cfg := RunnerConfig{
+		APIKey: "test-key",
+		Model:  "test-model",
+	}
+
+	agent, err := NewAgent(cfg, nil)
+	require.NoError(t, err)
+
+	// Test with testdata/skills directory if it exists
+	skillsDir := "./testdata/skills"
+	if _, err := os.Stat(skillsDir); os.IsNotExist(err) {
+		t.Skip("testdata/skills directory does not exist")
+	}
+
+	skills, err := agent.discoverSkills(skillsDir)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, skills)
+}
+
+// TestExecuteToolCall_RunPythonCode tests Python code execution
+func TestExecuteToolCall_RunPythonCode(t *testing.T) {
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	argsJSON := `{"code": "print('hello from python')", "args": {}}`
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_python_code",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "hello from python")
+}
+
+// TestExecuteToolCall_CustomScript tests custom script execution
+func TestExecuteToolCall_CustomScript(t *testing.T) {
+	// Create a temporary script
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "test.sh")
+	scriptContent := "#!/bin/bash\necho 'custom script output'"
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0755))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	scriptMap := map[string]string{
+		"run_custom_script": scriptPath,
+	}
+
+	argsJSON := `{"args": []}`
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_custom_script",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, scriptMap, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "custom script output")
+}
+
+// TestExecuteToolCall_RunShellScript tests shell script execution
+func TestExecuteToolCall_RunShellScript(t *testing.T) {
+	// Create a temporary script
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "test.sh")
+	scriptContent := "#!/bin/bash\necho 'shell script output'"
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0755))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	argsJSON := fmt.Sprintf(`{"scriptPath": "%s", "args": []}`, scriptPath)
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_shell_script",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "shell script output")
+}
+
+// TestExecuteToolCall_RunPythonScript tests Python script execution
+func TestExecuteToolCall_RunPythonScript(t *testing.T) {
+	// Create a temporary Python script
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "test.py")
+	scriptContent := "print('python script output')"
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0644))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	argsJSON := fmt.Sprintf(`{"scriptPath": "%s", "args": []}`, scriptPath)
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_python_script",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "python script output")
+}
+
+// TestExecuteToolCall_ReadFileRelativePath tests reading file with relative path
+func TestExecuteToolCall_ReadFileRelativePath(t *testing.T) {
+	// Create a temporary directory structure
+	tmpDir := t.TempDir()
+	skillPath := filepath.Join(tmpDir, "skill")
+	require.NoError(t, os.MkdirAll(skillPath, 0755))
+
+	// Create a file in the skill directory
+	testFile := "test.txt"
+	testContent := "relative path test content"
+	require.NoError(t, os.WriteFile(filepath.Join(skillPath, testFile), []byte(testContent), 0644))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	// Use relative path
+	argsJSON := fmt.Sprintf(`{"filePath": "%s"}`, testFile)
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "read_file",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, nil, skillPath)
+	assert.NoError(t, err)
+	assert.Contains(t, output, testContent)
+}
+
+// TestExecuteToolCall_CustomPythonScript tests custom Python script execution
+func TestExecuteToolCall_CustomPythonScript(t *testing.T) {
+	// Create a temporary Python script
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "custom.py")
+	scriptContent := "print('custom python output')"
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0644))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	scriptMap := map[string]string{
+		"run_custom_python": scriptPath,
+	}
+
+	argsJSON := `{"args": []}`
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_custom_python",
+			Arguments: argsJSON,
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, scriptMap, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "custom python output")
+}
+
+// TestExecuteToolCall_CustomScriptWithEmptyArgs tests custom script with empty arguments
+func TestExecuteToolCall_CustomScriptWithEmptyArgs(t *testing.T) {
+	// Create a temporary script
+	tmpDir := t.TempDir()
+	scriptPath := filepath.Join(tmpDir, "test.sh")
+	scriptContent := "#!/bin/bash\necho 'no args'"
+	require.NoError(t, os.WriteFile(scriptPath, []byte(scriptContent), 0755))
+
+	agent := &Agent{
+		cfg: RunnerConfig{
+			AutoApproveTools: true,
+		},
+	}
+
+	scriptMap := map[string]string{
+		"run_script_no_args": scriptPath,
+	}
+
+	// Empty arguments string
+	toolCall := openai.ToolCall{
+		ID:   "test-id",
+		Type: openai.ToolTypeFunction,
+		Function: openai.FunctionCall{
+			Name:      "run_script_no_args",
+			Arguments: "",
+		},
+	}
+
+	output, err := agent.executeToolCall(toolCall, scriptMap, "")
+	assert.NoError(t, err)
+	assert.Contains(t, output, "no args")
+}
+
+// TestContinueSkillWithTools_APIError tests error handling when API call fails
+func TestContinueSkillWithTools_APIError(t *testing.T) {
+	mockClient := NewMockOpenAIClient(nil, fmt.Errorf("API error"))
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill := SkillPackage{
+		Meta: SkillMeta{Name: "test"},
+		Body: "Test",
+		Path: "/test",
+	}
+
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ChatCompletion error")
+	assert.Empty(t, result)
+}
+
+// TestRun_SelectionError tests error handling when skill selection fails
+func TestRun_SelectionError(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	require.NoError(t, os.MkdirAll(skillDir, 0755))
+
+	skillContent := `---
+name: test-skill
+description: A test skill
+---
+This is a test skill.`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644))
+
+	// Create mock that returns error
+	mockClient := NewMockOpenAIClient(nil, fmt.Errorf("selection error"))
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:            "test-model",
+			SkillsDir:        tmpDir,
+			Verbose:          false,
+			AutoApproveTools: true,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	result, err := agent.Run(context.Background(), "test prompt")
+	assert.Error(t, err)
+	assert.Empty(t, result)
+}
+
+// TestSelectAndPrepareSkill_NonExistentSkillSelected tests error when AI selects non-existent skill
+func TestSelectAndPrepareSkill_NonExistentSkillSelected(t *testing.T) {
+	tmpDir := t.TempDir()
+	skillDir := filepath.Join(tmpDir, "test-skill")
+	require.NoError(t, os.MkdirAll(skillDir, 0755))
+
+	skillContent := `---
+name: test-skill
+description: A test skill
+---
+This is a test skill.`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillContent), 0644))
+
+	// Mock returns a skill name that doesn't exist
+	mockResponse := openai.ChatCompletionResponse{
+		Choices: []openai.ChatCompletionChoice{
+			{
+				Message: openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: "non-existent-skill",
+				},
+			},
+		},
+	}
+
+	mockClient := NewMockOpenAIClient([]openai.ChatCompletionResponse{mockResponse}, nil)
+
+	agent := &Agent{
+		client: mockClient,
+		cfg: RunnerConfig{
+			Model:     "test-model",
+			SkillsDir: tmpDir,
+			Verbose:   false,
+		},
+		messages: []openai.ChatCompletionMessage{},
+	}
+
+	skill, err := agent.selectAndPrepareSkill(context.Background(), "test prompt")
+	assert.Error(t, err)
+	assert.Nil(t, skill)
+	assert.Contains(t, err.Error(), "llm selected a non-existent skill")
 }
