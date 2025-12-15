@@ -11,7 +11,7 @@ import (
 
 // GenerateToolDefinitions generates the list of OpenAI tools for a given skill.
 // It returns the tool definitions and a map of tool names to script paths for execution.
-func GenerateToolDefinitions(skill SkillPackage) ([]openai.Tool, map[string]string) {
+func GenerateToolDefinitions(skill *SkillPackage) ([]openai.Tool, map[string]string) {
 	var tools []openai.Tool
 	scriptMap := make(map[string]string)
 

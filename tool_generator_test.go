@@ -19,7 +19,7 @@ func TestGenerateToolDefinitions_AllowedTools(t *testing.T) {
 		},
 	}
 
-	tools, scriptMap := GenerateToolDefinitions(skill)
+	tools, scriptMap := GenerateToolDefinitions(&skill)
 
 	// Should have 2 allowed base tools + 2 script tools
 	assert.Len(t, tools, 4)
@@ -48,7 +48,7 @@ func TestGenerateToolDefinitions_NoAllowedTools(t *testing.T) {
 		},
 	}
 
-	tools, scriptMap := GenerateToolDefinitions(skill)
+	tools, scriptMap := GenerateToolDefinitions(&skill)
 
 	// Should have all base tools + 1 script tool
 	assert.Greater(t, len(tools), 1) // At least one script tool
@@ -71,7 +71,7 @@ func TestGenerateToolDefinitions_NoScripts(t *testing.T) {
 		},
 	}
 
-	tools, scriptMap := GenerateToolDefinitions(skill)
+	tools, scriptMap := GenerateToolDefinitions(&skill)
 
 	// Should have only the allowed base tool
 	assert.Len(t, tools, 1)
@@ -166,7 +166,7 @@ func TestGenerateToolDefinitions_EmptySkill(t *testing.T) {
 		},
 	}
 
-	tools, scriptMap := GenerateToolDefinitions(skill)
+	tools, scriptMap := GenerateToolDefinitions(&skill)
 
 	// Should have all base tools
 	assert.Greater(t, len(tools), 0)

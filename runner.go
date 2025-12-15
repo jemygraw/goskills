@@ -77,7 +77,7 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (string, error) {
 		log.Info(strings.Repeat("-", 40))
 	}
 
-	return a.executeSkillWithTools(ctx, userPrompt, *selectedSkill)
+	return a.executeSkillWithTools(ctx, userPrompt, selectedSkill)
 }
 
 // RunLoop starts an interactive session for a selected skill.
@@ -87,22 +87,12 @@ func (a *Agent) RunLoop(ctx context.Context, initialPrompt string) error {
 		return err
 	}
 
-	// Prepare the system message once
-	var skillBody strings.Builder
-	skillBody.WriteString(selectedSkill.Body)
-	skillBody.WriteString("\n\n## SKILL CONTEXT\n")
-	skillBody.WriteString(fmt.Sprintf("Skill Root Path: %s\n", selectedSkill.Path))
-	a.messages = append(a.messages, openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: skillBody.String(),
-	})
-
 	reader := bufio.NewReader(os.Stdin)
 	currentPrompt := initialPrompt
 
 	for {
 		log.Info(strings.Repeat("-", 40))
-		finalOutput, err := a.continueSkillWithTools(ctx, currentPrompt, *selectedSkill)
+		finalOutput, err := a.continueSkillWithTools(ctx, currentPrompt, selectedSkill)
 		if err != nil {
 			log.Error("error during execution: %v", err)
 		} else {
@@ -249,7 +239,7 @@ func extractSkillName(content string, skills map[string]SkillPackage) string {
 }
 
 // executeSkillWithTools sets up the initial system prompt and starts the tool-use conversation.
-func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, skill SkillPackage) (string, error) {
+func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, skill *SkillPackage) (string, error) {
 	// Prepare the system message once
 	var skillBody strings.Builder
 	skillBody.WriteString(skill.Body)
@@ -264,7 +254,7 @@ func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, sk
 }
 
 // continueSkillWithTools continues a conversation with a new user prompt.
-func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, skill SkillPackage) (string, error) {
+func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, skill *SkillPackage) (string, error) {
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleUser,
 		Content: userPrompt,

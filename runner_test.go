@@ -651,7 +651,7 @@ func TestExecuteSkillWithTools(t *testing.T) {
 		Path: "/test/path",
 	}
 
-	result, err := agent.executeSkillWithTools(context.Background(), "test prompt", skill)
+	result, err := agent.executeSkillWithTools(context.Background(), "test prompt", &skill)
 	assert.NoError(t, err)
 	assert.Equal(t, "Final response", result)
 }
@@ -716,7 +716,7 @@ func TestContinueSkillWithTools_WithToolCalls(t *testing.T) {
 		Path: "/test",
 	}
 
-	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", &skill)
 	assert.NoError(t, err)
 	assert.Equal(t, "File content processed", result)
 }
@@ -765,7 +765,7 @@ func TestContinueSkillWithTools_MaxIterations(t *testing.T) {
 		Path: "/test",
 	}
 
-	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", &skill)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeded maximum tool call iterations")
 	assert.Empty(t, result)
@@ -1025,7 +1025,7 @@ func TestContinueSkillWithTools_APIError(t *testing.T) {
 		Path: "/test",
 	}
 
-	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", skill)
+	result, err := agent.continueSkillWithTools(context.Background(), "test prompt", &skill)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "ChatCompletion error")
 	assert.Empty(t, result)
