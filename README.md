@@ -71,14 +71,14 @@ GoSkills provides two command-line tools for different purposes:
 
 ### 1. Skill Management CLI (`goskills-cli`)
 
-Located in `cmd/skill-cli`, this tool helps you inspect and manage your local Claude skills.
+Located in `cmd/goskills-cli`, this tool helps you inspect and manage your local Claude skills.
 
 #### Building `goskills-cli`
 
 ```shell
 make cli
 # or
-go build -o goskills-cli ./cmd/skill-cli
+go build -o goskills-cli ./cmd/goskills-cli
 ```
 
 #### Available Commands

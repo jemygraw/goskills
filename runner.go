@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
+	"github.com/smallnest/goskills/log"
 	"github.com/smallnest/goskills/mcp"
 	"github.com/smallnest/goskills/tool"
 )
@@ -72,8 +73,8 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (string, error) {
 
 	// --- STEP 3: SKILL EXECUTION (with Tool Calling) ---
 	if a.cfg.Verbose {
-		fmt.Println("🚀 Executing skill (with potential tool calls).")
-		fmt.Println(strings.Repeat("-", 40))
+		log.Info("executing skill (with potential tool calls)")
+		log.Info(strings.Repeat("-", 40))
 	}
 
 	return a.executeSkillWithTools(ctx, userPrompt, *selectedSkill)
@@ -100,13 +101,13 @@ func (a *Agent) RunLoop(ctx context.Context, initialPrompt string) error {
 	currentPrompt := initialPrompt
 
 	for {
-		fmt.Println(strings.Repeat("-", 40))
+		log.Info(strings.Repeat("-", 40))
 		finalOutput, err := a.continueSkillWithTools(ctx, currentPrompt, *selectedSkill)
 		if err != nil {
-			fmt.Printf("❌ Error during execution: %v\n", err)
+			log.Error("error during execution: %v", err)
 		} else {
-			fmt.Println("✅ Final Output:")
-			fmt.Println(finalOutput)
+			log.Info("final output:")
+			log.Info("%s", finalOutput)
 		}
 
 		fmt.Print("\nContinue in loop? (y/N) or enter new prompt: ")
@@ -132,7 +133,7 @@ func (a *Agent) RunLoop(ctx context.Context, initialPrompt string) error {
 func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*SkillPackage, error) {
 	// --- STEP 1: SKILL DISCOVERY ---
 	if a.cfg.Verbose {
-		fmt.Printf("🔎 Discovering available skills in %s...\n", a.cfg.SkillsDir)
+		log.Info("discovering available skills in %s...", a.cfg.SkillsDir)
 	}
 	availableSkills, err := a.discoverSkills(a.cfg.SkillsDir)
 	if err != nil {
@@ -142,12 +143,12 @@ func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*
 		return nil, errors.New("no valid skills found")
 	}
 	if a.cfg.Verbose {
-		fmt.Printf("✅ Found %d skills.\n\n", len(availableSkills))
+		log.Info("found %d skills", len(availableSkills))
 	}
 
 	// --- STEP 2: SKILL SELECTION ---
 	if a.cfg.Verbose {
-		fmt.Println("🧠 Asking LLM to select the best skill...")
+		log.Info("asking llm to select the best skill")
 	}
 	selectedSkillName, err := a.selectSkill(ctx, userPrompt, availableSkills)
 	if err != nil {
@@ -156,10 +157,10 @@ func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*
 
 	selectedSkill, ok := availableSkills[selectedSkillName]
 	if !ok {
-		return nil, fmt.Errorf("⚠️ LLM selected a non-existent skill '%s'. Aborting", selectedSkillName)
+		return nil, fmt.Errorf("llm selected a non-existent skill '%s'. aborting", selectedSkillName)
 	}
 	if a.cfg.Verbose {
-		fmt.Printf("✅ LLM selected skill: %s\n\n", selectedSkillName)
+		log.Info("llm selected skill: %s", selectedSkillName)
 	}
 	return &selectedSkill, nil
 }
@@ -275,7 +276,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 	if a.mcpClient != nil {
 		mcpTools, err := a.mcpClient.GetTools(ctx)
 		if err != nil {
-			fmt.Printf("⚠️ Failed to get MCP tools: %v\n", err)
+			log.Warn("failed to get mcp tools: %v", err)
 		} else {
 			availableTools = append(availableTools, mcpTools...)
 		}
@@ -305,7 +306,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 		for _, tc := range msg.ToolCalls {
 			if a.cfg.Verbose {
-				fmt.Printf("⚙️ Calling tool: %s with args: %s\n", tc.Function.Name, tc.Function.Arguments)
+				log.Info("calling tool: %s with args: %s", tc.Function.Name, tc.Function.Arguments)
 			}
 
 			if !a.cfg.AutoApproveTools {
@@ -354,7 +355,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 			}
 
 			if err != nil {
-				fmt.Printf("❌ Tool call failed: %v\n", err)
+				log.Error("tool call failed: %v", err)
 				a.messages = append(a.messages, openai.ChatCompletionMessage{
 					Role:       openai.ChatMessageRoleTool,
 					ToolCallID: tc.ID,
@@ -487,9 +488,9 @@ func (a *Agent) executeToolCall(toolCall openai.ToolCall, scriptMap map[string]s
 	}
 
 	if err != nil {
-		fmt.Printf("❌ Tool execution failed for %s: %v\n", toolCall.Function.Name, err)
+		log.Error("tool execution failed for %s: %v", toolCall.Function.Name, err)
 		if toolCall.Function.Arguments != "" {
-			fmt.Printf("Raw Arguments: %s\n", toolCall.Function.Arguments)
+			log.Debug("raw arguments: %s", toolCall.Function.Arguments)
 		}
 		return "", fmt.Errorf("tool execution failed for %s: %w", toolCall.Function.Name, err)
 	}

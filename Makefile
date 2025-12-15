@@ -43,7 +43,7 @@ build: cli runner
 ## cli: Build CLI binary
 cli:
 	@echo "$(COLOR_BLUE)Building CLI...$(COLOR_RESET)"
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_CLI) ./cmd/skill-cli
+	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_CLI) ./cmd/goskills-cli
 
 ## runner: Build runner binary
 runner:

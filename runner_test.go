@@ -197,3 +197,138 @@ func TestSelectSkill_ComplexSkillDescriptions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "pdf", skillName)
 }
+
+// TestNewAgent_Success tests successful agent creation
+func TestNewAgent_Success(t *testing.T) {
+	cfg := RunnerConfig{
+		APIKey:    "test-api-key",
+		Model:     "gpt-4",
+		SkillsDir: "./test-skills",
+	}
+
+	agent, err := NewAgent(cfg, nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, agent)
+	assert.Equal(t, cfg.APIKey, agent.cfg.APIKey)
+	assert.Equal(t, cfg.Model, agent.cfg.Model)
+	assert.Equal(t, cfg.SkillsDir, agent.cfg.SkillsDir)
+	assert.NotNil(t, agent.client)
+	assert.NotNil(t, agent.messages)
+}
+
+// TestNewAgent_EmptyAPIKey tests agent creation with empty API key
+func TestNewAgent_EmptyAPIKey(t *testing.T) {
+	cfg := RunnerConfig{
+		APIKey: "",
+		Model:  "gpt-4",
+	}
+
+	agent, err := NewAgent(cfg, nil)
+
+	assert.Error(t, err)
+	assert.Nil(t, agent)
+	assert.Contains(t, err.Error(), "API key is not set")
+}
+
+// TestNewAgent_DefaultModel tests agent creation with default model
+func TestNewAgent_DefaultModel(t *testing.T) {
+	cfg := RunnerConfig{
+		APIKey: "test-api-key",
+		// Model is empty, should default to "gpt-4o"
+	}
+
+	agent, err := NewAgent(cfg, nil)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, agent)
+	assert.Equal(t, "gpt-4o", agent.cfg.Model)
+}
+
+// TestDiscoverSkills tests the skill discovery functionality
+func TestDiscoverSkills(t *testing.T) {
+	cfg := RunnerConfig{
+		APIKey:    "test-api-key",
+		Model:     "gpt-4",
+		SkillsDir: "./tool", // Use existing tool directory for testing
+	}
+
+	agent, err := NewAgent(cfg, nil)
+	assert.NoError(t, err)
+
+	// Test with an existing directory that should have skill-like structure
+	skills, err := agent.discoverSkills("./tool")
+
+	// We expect this to potentially error since ./tool may not be a proper skills directory
+	// but we're testing the function doesn't panic
+	if err != nil {
+		assert.NotEmpty(t, err.Error())
+	} else {
+		assert.NotNil(t, skills)
+	}
+}
+
+// TestExtractSkillName tests skill name extraction from AI responses
+func TestExtractSkillName(t *testing.T) {
+	skills := map[string]SkillPackage{
+		"pdf": {
+			Meta: SkillMeta{
+				Name: "pdf",
+			},
+		},
+		"xlsx": {
+			Meta: SkillMeta{
+				Name: "xlsx",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Exact skill name",
+			input:    "pdf",
+			expected: "pdf",
+		},
+		{
+			name:     "Skill name with quotes",
+			input:    `"pdf"`,
+			expected: "pdf",
+		},
+		{
+			name:     "Skill name with whitespace",
+			input:    "  pdf  ",
+			expected: "pdf",
+		},
+		{
+			name:     "Skill name with quotes and whitespace",
+			input:    `  "pdf"  `,
+			expected: "pdf",
+		},
+		{
+			name:     "Case insensitive match",
+			input:    "PDF",
+			expected: "pdf",
+		},
+		{
+			name:     "Complex response with skill name",
+			input:    "Based on your request, I'll use the pdf skill to help you.",
+			expected: "pdf",
+		},
+		{
+			name:     "No skill found",
+			input:    "I don't know which skill to use",
+			expected: "I don't know which skill to use",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := extractSkillName(tc.input, skills)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

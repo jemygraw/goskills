@@ -73,14 +73,14 @@ GoSkills 提供两个用于不同目的的命令行工具：
 
 ### 1. 技能管理 CLI (`goskills-cli`)
 
-位于 `cmd/skill-cli`，此工具帮助你检查和管理本地 Claude 技能。
+位于 `cmd/goskills-cli`，此工具帮助你检查和管理本地 Claude 技能。
 
 #### 构建 `goskills-cli`
 
 ```shell
 make cli
 # 或
-go build -o goskills-cli ./cmd/skill-cli
+go build -o goskills-cli ./cmd/goskills-cli
 ```
 
 #### 可用命令

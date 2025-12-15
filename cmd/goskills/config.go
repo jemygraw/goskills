@@ -78,7 +78,7 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 	if cfg.Model == "" {
 		cfg.Model = os.Getenv("OPENAI_MODEL")
 	}
-	cfg.APIBase = strings.TrimSuffix(cfg.APIBase, "/")
+	cfg.APIBase = strings.TrimRight(cfg.APIBase, "/")
 
 	// Resolve SkillsDir to absolute path
 	if cfg.SkillsDir == "" {

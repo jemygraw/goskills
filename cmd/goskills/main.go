@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/smallnest/goskills"
+	"github.com/smallnest/goskills/log"
 	goskills_mcp "github.com/smallnest/goskills/mcp"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ func Execute() {
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		log.Error("command execution failed: %v", err)
 		os.Exit(1)
 	}
 }
@@ -99,19 +100,19 @@ You can specify a custom model and API base URL using flags.`,
 
 		if mcpConfigPath != "" {
 			if cfg.Verbose {
-				fmt.Printf("📂 Loading MCP config from: %s\n", mcpConfigPath)
+				log.Info("loading mcp config from: %s", mcpConfigPath)
 			}
 			mcpConfig, err := goskills_mcp.LoadConfig(mcpConfigPath)
 			if err != nil {
-				fmt.Printf("⚠️ Failed to load MCP config: %v\n", err)
+				log.Warn("failed to load mcp config: %v", err)
 			} else {
 				mcpClient, err = goskills_mcp.NewClient(ctx, mcpConfig)
 				if err != nil {
-					fmt.Printf("⚠️ Failed to create MCP client: %v\n", err)
+					log.Warn("failed to create mcp client: %v", err)
 				} else {
 					defer mcpClient.Close()
 					if cfg.Verbose {
-						fmt.Println("✅ MCP Client initialized.")
+						log.Info("mcp client initialized")
 					}
 				}
 			}
