@@ -1,4 +1,4 @@
-package config
+package main
 
 import (
 	"os"
@@ -21,8 +21,8 @@ type Config struct {
 	McpConfig        string
 }
 
-// LoadConfig loads configuration from flags and environment variables
-func LoadConfig(cmd *cobra.Command) (*Config, error) {
+// loadConfig loads configuration from flags and environment variables
+func loadConfig(cmd *cobra.Command) (*Config, error) {
 	cfg := &Config{}
 
 	// 1. Load from flags (if set)
@@ -94,7 +94,7 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 }
 
 // SetupFlags registers the flags with the command
-func SetupFlags(cmd *cobra.Command) {
+func setupFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("skills-dir", "d", "./testdata/skills", "Path to the skills directory")
 	cmd.Flags().StringP("model", "m", "", "OpenAI-compatible model name (falls back to OPENAI_MODEL env var)")
 	cmd.Flags().StringP("api-base", "b", "", "OpenAI-compatible API base URL (falls back to OPENAI_API_BASE env var)")
