@@ -8,14 +8,16 @@
     <meta name="description"
         content="A powerful Go package to parse and run Claude Skill packages. Integrate LLM capabilities into your Go applications with ease.">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.gstatic.cn">
-    <link href="https://fonts.googleapis.cn/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code&display=swap"
+    <link rel="preconnect" href="https://fonts.gstatic.cn" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
         rel="stylesheet">
     <!-- Font Awesome for Icons -->
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/7.0.1/css/all.min.css/css/all.min.css">
 </head>
 
 <body>
+    <!-- Animated particles container -->
+    <div class="particles-container"></div>
     <header>
         <div class="nav-container">
             <a href="index.html" class="logo">
@@ -29,7 +31,6 @@
                 <a href="index.html" class="active">Home</a>
                 <a href="documentation.html">Documentation</a>
                 <a href="usage.html">Integration</a>
-                <a href="agent.html">DeepResearch</a>
                 <a href="examples.html">Examples</a>
                 <a href="https://github.com/smallnest/goskills" target="_blank"><i class="fa-brands fa-github"></i>
                     GitHub</a>
@@ -49,17 +50,7 @@
             </div>
         </section>
 
-        <div style="max-width: 800px; margin: 0 auto 40px; padding: 0 20px; text-align: center;">
-            <div
-                style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-                <iframe src="https://www.youtube.com/embed/Lod9DnAfd9c"
-                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowfullscreen>
-                </iframe>
-            </div>
-        </div>
-
+  
         <div style="max-width: 800px; margin: 0 auto 60px; padding: 0 20px;">
             <div class="feature-card" style="text-align: left;">
                 <pre style="margin: 0;"><code># brew untap smallnest/goskills
@@ -123,7 +114,45 @@ goskills run --auto-approve "use markitdown to parse https://baike.baidu.com/ite
         <p>&copy; 2025 GoSkills. Released under the MIT License.</p>
     </footer>
 
-    <script src="js/main.js"></script>
+    <script>
+        // Create particles dynamically
+        function createParticles() {
+            const container = document.querySelector('.particles-container');
+            const particleCount = 50;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+
+            // Create geometric shapes
+            for (let i = 0; i < 5; i++) {
+                const shapes = ['triangle', 'square', 'circle'];
+                const shape = document.createElement('div');
+                shape.className = `geometric-shape ${shapes[i % 3]}`;
+                shape.style.left = Math.random() * 100 + '%';
+                shape.style.top = Math.random() * 100 + '%';
+                shape.style.animationDelay = Math.random() * 20 + 's';
+                container.appendChild(shape);
+            }
+        }
+
+        // Initialize particles when page loads
+        document.addEventListener('DOMContentLoaded', createParticles);
+
+        // Add parallax effect on mouse move
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+
+            document.body.style.setProperty('--mouse-x', x);
+            document.body.style.setProperty('--mouse-y', y);
+        });
+    </script>
 </body>
 
 </html>

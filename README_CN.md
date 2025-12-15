@@ -1,71 +1,89 @@
-# Go Claude Skills Parser
+# GoSkills - Claude Skills 管理工具
 
 [English](README.md) | 简体中文
 
-这是一个 Go 语言包，用于从目录结构中解析 Claude Skill 包。该解析器是根据 [官方 Claude 文档](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/) 中的规范设计的。
+一个强大的命令行工具，用于解析、管理和执行 Claude Skill 包。GoSkills 是根据 [官方 Claude 文档](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/) 中的规范设计的。
 
-[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![GoDoc](https://godoc.org/github.com/smallnest/goskills?status.png)](http://godoc.org/github.com/smallnest/goskills)  [![github actions](https://github.com/smallnest/goskills/actions/workflows/go.yml/badge.svg)](https://github.com/smallnest/goskills/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/goskills)](https://goreportcard.com/report/github.com/smallnest/goskills) 
+[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![github actions](https://github.com/smallnest/goskills/actions/workflows/go.yml/badge.svg)](https://github.com/smallnest/goskills/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/goskills)](https://goreportcard.com/report/github.com/smallnest/goskills)
 
 [![YouTube Video](https://img.youtube.com/vi/Lod9DnAfd9c/maxresdefault.jpg)](https://www.youtube.com/watch?v=Lod9DnAfd9c)
 
 ## 特性
 
-- 解析 `SKILL.md` 获取技能元数据和指令。
-- 提取 YAML frontmatter 到 Go 结构体 (`SkillMeta`)。
-- 捕获技能的 Markdown 正文。
-- 发现 `scripts/`、`references/` 和 `assets/` 目录中的资源文件。
-- 打包为可重用的 Go 模块。
-- 包含用于管理和检查技能的命令行接口。
-- 包含一个深度研究 Agent。
+- **技能管理**: 从本地目录列出、搜索、解析和检查 Claude 技能
+- **运行时执行**: 通过 LLM 集成执行技能（OpenAI、Claude 和兼容 API）
+- **内置工具**: Shell 命令、Python 执行、文件操作、web 获取和搜索
+- **MCP 支持**: 模型上下文协议 (MCP) 服务器集成
+- **双 CLI 工具**: 分别用于技能管理和执行的工具
+- **全面测试**: 完整的测试套件和覆盖率报告
 
 ## 安装
 
-要在你的项目中使用此包，可以使用 `go get`：
+### 从源码编译
 
 ```shell
-go get github.com/smallnest/goskills
-```
-
-## 深度研究 Agent
-
-本项目包含一个独立的深度研究 Agent (`agent-web`)，展示了可组合 AI 技能的强大功能。
-
-- **规划器-执行器-子代理架构**：用于解决复杂任务的稳健设计。
-- **Web 界面**：现代化的 Web 界面，提供出色的用户体验。
-- **无外部框架**：纯 Go 实现，易于理解和扩展。
-
-![Agent Workflow](docs/images/agent_worflow.png)
-![Agent Web Interface](docs/images/agent_web.png)
-
-**演示环境**：[https://agent.rpcx.io](https://agent.rpcx.io)
-
-快速开始：
-
-```shell
-export OPENAI_API_KEY="YOUR_KEY"
-export TAVILY_API_KEY="YOUR_TAVILY_KEY"
+git clone https://github.com/smallnest/goskills.git
+cd goskills
 make
-./agent-web -v
 ```
 
-更多详情请参阅 [agent.md](agent.md)。
+### 使用 Homebrew
 
-## 命令行接口
+```shell
+brew install smallnest/goskills/goskills
+```
 
-本项目提供了两个独立的命令行工具：
+或者：
+
+```shell
+# 添加 tap
+brew tap smallnest/goskills
+
+# 安装 goskills
+brew install goskills
+```
+
+## 快速开始
+
+```shell
+# 设置你的 OpenAI API 密钥
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+
+# 列出可用技能
+./goskills-cli list ./skills
+
+# 运行技能
+./goskills run "创建一个待办事项应用的 React 组件"
+```
+
+## 内置工具
+
+GoSkills 包含一套全面的内置工具，用于技能执行：
+
+- **Shell 工具**：执行 shell 命令和脚本
+- **Python 工具**：运行 Python 代码和脚本
+- **文件工具**：读取、写入和管理文件
+- **Web 工具**：获取和处理 Web 内容
+- **搜索工具**：Wikipedia 和 Tavily 搜索集成
+- **MCP 工具**：与模型上下文协议服务器集成
+
+## CLI 工具
+
+GoSkills 提供两个用于不同目的的命令行工具：
 
 ### 1. 技能管理 CLI (`goskills-cli`)
 
 位于 `cmd/skill-cli`，此工具帮助你检查和管理本地 Claude 技能。
 
 #### 构建 `goskills-cli`
-你可以从项目根目录构建可执行文件：
+
 ```shell
+make cli
+# 或
 go build -o goskills-cli ./cmd/skill-cli
 ```
 
-#### 命令
-以下是 `goskills-cli` 的可用命令：
+#### 可用命令
 
 #### list
 列出给定目录中的所有有效技能。
@@ -97,18 +115,19 @@ go build -o goskills-cli ./cmd/skill-cli
 ./goskills-cli search ./testdata/skills "web app"
 ```
 
-### 2. 技能运行器 CLI (`goskills-runner`)
+### 2. 技能运行器 CLI (`goskills`)
 
-位于 `cmd/skill-runner`，此工具通过集成像 OpenAI 模型这样的大型语言模型 (LLM) 来模拟 Claude 技能使用工作流。
+位于 `cmd/goskills`，此工具通过集成像 OpenAI 模型这样的大型语言模型 (LLM) 来模拟 Claude 技能使用工作流。
 
 #### 构建 `goskills` 运行器
-你可以从项目根目录构建可执行文件：
+
 ```shell
-go build -o goskills ./cmd/skill-runner
+make runner
+# 或
+go build -o goskills ./cmd/goskills
 ```
 
-#### 命令
-以下是 `goskills` 的可用命令：
+#### 可用命令
 
 #### run
 处理用户请求，首先发现可用技能，然后要求 LLM 选择最合适的技能，最后通过将所选技能的内容作为系统提示提供给 LLM 来执行该技能。
@@ -137,78 +156,90 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./testdata/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
 
-## 库的使用
 
-下面是一个如何使用 `goskills` 库中的 `ParseSkillPackage` 函数来解析技能目录的示例。
+## 开发
 
-```go
-package main
+### Make 命令
 
-import (
-	"fmt"
-	"log"
+项目包含一个全面的 Makefile 用于开发任务：
 
-	"github.com/smallnest/goskills"
-)
+```shell
+# 帮助 - 显示所有可用命令
+make help
 
-func main() {
-	// 你想要解析的技能目录的路径
-	skillDirectory := "./testdata/skills/artifacts-builder"
+# 构建
+make build          # 构建 CLI 和运行器
+make cli            # 仅构建 CLI
+make runner         # 仅构建运行器
 
-	skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
-	if err != nil {
-		log.Fatalf("解析技能包失败: %v", err)
-	}
+# 测试
+make test           # 运行所有测试
+make test-race      # 运行带竞态检测的测试
+make test-coverage  # 运行测试并生成覆盖率报告
+make benchmark      # 运行基准测试
 
-	// 打印解析后的信息
-	fmt.Printf("成功解析技能: %s\n", skillPackage.Meta.Name)
-	// ... 等等
+# 代码质量
+make check          # 运行 fmt-check、vet 和 lint
+make fmt            # 格式化所有 Go 文件
+make vet            # 运行 go vet
+make lint           # 运行 golangci-lint
+
+# 依赖管理
+make deps           # 下载依赖
+make tidy           # 整理并验证依赖
+
+# 其他
+make clean          # 清理构建产物
+make install-tools  # 安装开发工具
+make info           # 显示项目信息
+```
+
+### 运行所有测试
+
+```shell
+# 运行全面的测试套件
+make test-coverage
+
+# 运行特定工具测试
+cd tool && ./test_all.sh
+```
+
+## 配置
+
+### 环境变量
+
+- `OPENAI_API_KEY`: LLM 集成的 OpenAI API 密钥
+- `OPENAI_API_BASE`: 自定义 API 基础 URL（可选）
+- `OPENAI_MODEL`: 自定义模型名称（可选）
+- `TAVILY_API_KEY`: Tavily 搜索 API 密钥
+- `MCP_CONFIG`: MCP 配置文件路径
+
+### MCP 集成
+
+通过创建 `mcp.json` 文件来配置模型上下文协议 (MCP) 服务器：
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "path/to/server",
+      "args": ["arg1", "arg2"]
+    }
+  }
 }
 ```
 
-### ParseSkillPackages
+## 贡献
 
-要查找并解析目录及其子目录中的所有有效技能包，可以使用 `ParseSkillPackages` 函数。它递归扫描给定的路径，识别所有包含 `SKILL.md` 文件的目录，并返回成功解析的 `*SkillPackage` 对象切片。
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交你的更改
+4. 运行测试 (`make test`)
+5. 运行代码检查 (`make check`)
+6. 提交更改 (`git commit -m 'Add amazing feature'`)
+7. 推送到分支 (`git push origin feature/amazing-feature`)
+8. 打开 Pull Request
 
-```go
-package main
+## 许可证
 
-import (
-	"fmt"
-	"log"
-
-	"github.com/smallnest/goskills"
-)
-
-func main() {
-	// 包含所有技能的目录
-	skillsRootDirectory := "./testdata/skills"
-
-	packages, err := goskills.ParseSkillPackages(skillsRootDirectory)
-	if err != nil {
-		log.Fatalf("解析技能包失败: %v", err)
-	}
-
-	fmt.Printf("找到 %d 个技能:\n", len(packages))
-	for _, pkg := range packages {
-		fmt.Printf("- 路径: %s, 名称: %s\n", pkg.Path, pkg.Meta.Name)
-	}
-}
-```
-
-## 安装
-
-```
-brew install smallnest/goskills/goskills
-```
-
-或者
-
-```
-# 添加 tap
-brew tap smallnest/goskills
-
-# 安装 goskills
-brew install goskills
-
-```
+本项目在 MIT 许可证下授权 - 详情请参阅 [LICENSE](LICENSE) 文件。

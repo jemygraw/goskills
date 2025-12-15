@@ -1,71 +1,87 @@
-# Go Claude Skills Parser
+# GoSkills - Claude Skills Management Tool
 
 English | [简体中文](README_CN.md)
 
-A Go package to parse Claude Skill packages from a directory structure. This parser is designed according to the specifications found in the [official Claude documentation](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/).
+A powerful command-line tool to parse, manage, and execute Claude Skill packages. GoSkills is designed according to the specifications found in the [official Claude documentation](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/).
 
-[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![GoDoc](https://godoc.org/github.com/smallnest/goskills?status.png)](http://godoc.org/github.com/smallnest/goskills)  [![github actions](https://github.com/smallnest/goskills/actions/workflows/go.yml/badge.svg)](https://github.com/smallnest/goskills/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/goskills)](https://goreportcard.com/report/github.com/smallnest/goskills) 
-
-[![YouTube Video](https://img.youtube.com/vi/Lod9DnAfd9c/maxresdefault.jpg)](https://www.youtube.com/watch?v=Lod9DnAfd9c)
+[![License](https://img.shields.io/:license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![github actions](https://github.com/smallnest/goskills/actions/workflows/go.yml/badge.svg)](https://github.com/smallnest/goskills/actions) [![Go Report Card](https://goreportcard.com/badge/github.com/smallnest/goskills)](https://goreportcard.com/report/github.com/smallnest/goskills)
 
 ## Features
 
-- Parses `SKILL.md` for skill metadata and instructions.
-- Extracts YAML frontmatter into a Go struct (`SkillMeta`).
-- Captures the Markdown body of the skill.
-- Discovers resource files in `scripts/`, `references/`, and `assets/` directories.
-- Packaged as a reusable Go module.
-- Includes command-line interfaces for managing and inspecting skills.
-- Includes a deep research agent.
+- **Skill Management**: List, search, parse, and inspect Claude skills from local directories
+- **Runtime Execution**: Execute skills with LLM integration (OpenAI, Claude, and compatible APIs)
+- **Built-in Tools**: Shell commands, Python execution, file operations, web fetching, and search
+- **MCP Support**: Model Context Protocol (MCP) server integration
+- **Dual CLI Tools**: Separate tools for skill management and execution
+- **Comprehensive Testing**: Full test suite with coverage reports
 
-## Installation 
+## Installation
 
-To use this package in your project, you can use `go get`:
-
-```shell
-go get github.com/smallnest/goskills
-```
-
-## Deep Research Agent
-
-This project includes a standalone Deep Research Agent (`agent-web`) that demonstrates the power of composable AI skills.
-
-- **Planner-Executor-SubAgents Architecture**: A robust design for complex task solving.
-- **Web Interface**: A modern web interface for a great user experience.
-- **No External Frameworks**: Pure Go implementation, easy to understand and extend.
-
-![Agent Workflow](docs/images/agent_worflow.png)
-![Agent Web Interface](docs/images/agent_web.png)
-
-**Demo**：[https://agent.rpcx.io](https://agent.rpcx.io)
-
-Quick Start:
+### From Source
 
 ```shell
-export OPENAI_API_KEY="YOUR_KEY"
-export TAVILY_API_KEY="YOUR_TAVILY_KEY"
+git clone https://github.com/smallnest/goskills.git
+cd goskills
 make
-./agent-web -v
 ```
 
-For more details, see  [agent.md](agent.md).
+### Using Homebrew
 
-## Command-Line Interfaces
+```shell
+brew install smallnest/goskills/goskills
+```
 
-This project provides two separate command-line tools:
+Or:
+
+```shell
+# add tap
+brew tap smallnest/goskills
+
+# install goskills
+brew install goskills
+```
+
+## Quick Start
+
+```shell
+# Set your OpenAI API key
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+
+# List available skills
+./goskills-cli list ./skills
+
+# Run a skill
+./goskills run "create a react component for a todo app"
+```
+
+## Built-in Tools
+
+GoSkills includes a comprehensive set of built-in tools for skill execution:
+
+- **Shell Tools**: Execute shell commands and scripts
+- **Python Tools**: Run Python code and scripts
+- **File Tools**: Read, write, and manage files
+- **Web Tools**: Fetch and process web content
+- **Search Tools**: Wikipedia and Tavily search integration
+- **MCP Tools**: Integration with Model Context Protocol servers
+
+## CLI Tools
+
+GoSkills provides two command-line tools for different purposes:
 
 ### 1. Skill Management CLI (`goskills-cli`)
 
 Located in `cmd/skill-cli`, this tool helps you inspect and manage your local Claude skills.
 
 #### Building `goskills-cli`
-You can build the executable from the project root:
+
 ```shell
+make cli
+# or
 go build -o goskills-cli ./cmd/skill-cli
 ```
 
-#### Commands
-Here are the available commands for `goskills-cli`:
+#### Available Commands
 
 #### list
 Lists all valid skills in a given directory.
@@ -97,18 +113,19 @@ Searches for skills by name or description within a directory. The search is cas
 ./goskills-cli search ./testdata/skills "web app"
 ```
 
-### 2. Skill Runner CLI (`goskills-runner`)
+### 2. Skill Runner CLI (`goskills`)
 
-Located in `cmd/skill-runner`, this tool simulates the Claude skill-use workflow by integrating with Large Language Models (LLMs) like OpenAI's models.
+Located in `cmd/goskills`, this tool simulates the Claude skill-use workflow by integrating with Large Language Models (LLMs) like OpenAI's models.
 
 #### Building `goskills` runner
-You can build the executable from the project root:
+
 ```shell
-go build -o goskills ./cmd/skill-runner
+make runner
+# or
+go build -o goskills ./cmd/goskills
 ```
 
-#### Commands
-Here are the available commands for `goskills`:
+#### Available Commands
 
 #### run
 Processes a user request by first discovering available skills, then asking an LLM to select the most appropriate one, and finally executing the selected skill by feeding its content to the LLM as a system prompt.
@@ -137,78 +154,90 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./testdata/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
 
-## Library Usage
 
-Here is an example of how to use the `ParseSkillPackage` function from the `goskills` library to parse a skill directory.
+## Development
 
-```go
-package main
+### Make Commands
 
-import (
-	"fmt"
-	"log"
+The project includes a comprehensive Makefile for development tasks:
 
-	"github.com/smallnest/goskills"
-)
+```shell
+# Help - shows all available commands
+make help
 
-func main() {
-	// Path to the skill directory you want to parse
-	skillDirectory := "./testdata/skills/artifacts-builder"
+# Build
+make build          # Build both CLI and runner
+make cli            # Build CLI only
+make runner         # Build runner only
 
-	skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
-	if err != nil {
-		log.Fatalf("Failed to parse skill package: %v", err)
-	}
+# Testing
+make test           # Run all tests
+make test-race      # Run tests with race detector
+make test-coverage  # Run tests with coverage report
+make benchmark      # Run benchmarks
 
-	// Print the parsed information
-	fmt.Printf("Successfully Parsed Skill: %s\n", skillPackage.Meta.Name)
-	// ... and so on
+# Code Quality
+make check          # Run fmt-check, vet, and lint
+make fmt            # Format all Go files
+make vet            # Run go vet
+make lint           # Run golangci-lint
+
+# Dependencies
+make deps           # Download dependencies
+make tidy           # Tidy and verify dependencies
+
+# Other
+make clean          # Clean build artifacts
+make install-tools  # Install development tools
+make info           # Display project information
+```
+
+### Running All Tests
+
+```shell
+# Run comprehensive test suite
+make test-coverage
+
+# Run specific tool tests
+cd tool && ./test_all.sh
+```
+
+## Configuration
+
+### Environment Variables
+
+- `OPENAI_API_KEY`: OpenAI API key for LLM integration
+- `OPENAI_API_BASE`: Custom API base URL (optional)
+- `OPENAI_MODEL`: Custom model name (optional)
+- `TAVILY_API_KEY`: Tavily search API key
+- `MCP_CONFIG`: Path to MCP configuration file
+
+### MCP Integration
+
+Configure Model Context Protocol (MCP) servers by creating a `mcp.json` file:
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "path/to/server",
+      "args": ["arg1", "arg2"]
+    }
+  }
 }
 ```
 
-### ParseSkillPackages
+## Contributing
 
-To find and parse all valid skill packages within a directory and its subdirectories, you can use the `ParseSkillPackages` function. It recursively scans the given path, identifies all directories containing a `SKILL.md` file, and returns a slice of successfully parsed `*SkillPackage` objects.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`make test`)
+5. Run linting (`make check`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
 
-```go
-package main
+## License
 
-import (
-	"fmt"
-	"log"
-
-	"github.com/smallnest/goskills"
-)
-
-func main() {
-	// Directory containing all your skills
-	skillsRootDirectory := "./testdata/skills"
-
-	packages, err := goskills.ParseSkillPackages(skillsRootDirectory)
-	if err != nil {
-		log.Fatalf("Failed to parse skill packages: %v", err)
-	}
-
-	fmt.Printf("Found %d skill(s):\n", len(packages))
-	for _, pkg := range packages {
-		fmt.Printf("- Path: %s, Name: %s\n", pkg.Path, pkg.Meta.Name)
-	}
-}
-```
-
-## Installation
-
-```
-brew install smallnest/goskills/goskills
-```
-
-or
-
-```
-# add tap
-brew tap smallnest/goskills
-
-# install goskills
-brew install goskills
-
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

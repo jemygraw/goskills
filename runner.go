@@ -311,7 +311,16 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 			if !a.cfg.AutoApproveTools {
 				fmt.Print("⚠️  Allow this tool execution? [y/N]: ")
 				var input string
-				fmt.Scanln(&input)
+				if _, err := fmt.Scanln(&input); err != nil {
+					// Handle scan error, default to denying
+					fmt.Println("\n❌ Tool execution denied due to input error.")
+					a.messages = append(a.messages, openai.ChatCompletionMessage{
+						Role:       openai.ChatMessageRoleTool,
+						ToolCallID: tc.ID,
+						Content:    "Error: Input scanning failed.",
+					})
+					continue
+				}
 				if strings.ToLower(strings.TrimSpace(input)) != "y" {
 					fmt.Println("❌ Tool execution denied by user.")
 					a.messages = append(a.messages, openai.ChatCompletionMessage{
@@ -331,7 +340,6 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 					toolOutput = fmt.Sprintf("Error unmarshalling arguments: %v", err)
-					err = fmt.Errorf("failed to unmarshal arguments: %w", err)
 				} else {
 					var result interface{}
 					result, err = a.mcpClient.CallTool(ctx, tc.Function.Name, args)

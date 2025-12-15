@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Documentation - GoSkills</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.gstatic.cn">
-    <link href="https://fonts.googleapis.cn/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code&display=swap"
+    <link rel="preconnect" href="https://fonts.gstatic.cn" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/7.0.1/css/all.min.css/css/all.min.css">
 </head>
 
 <body>
@@ -26,7 +26,6 @@
                 <a href="index.html">Home</a>
                 <a href="documentation.html" class="active">Documentation</a>
                 <a href="usage.html">Integration</a>
-                <a href="agent.html">DeepResearch</a>
                 <a href="examples.html">Examples</a>
                 <a href="https://github.com/smallnest/goskills" target="_blank"><i class="fa-brands fa-github"></i>
                     GitHub</a>
@@ -41,7 +40,7 @@
                 <li><a href="#installation">Installation</a></li>
                 <li><a href="#library-usage">Library Usage</a></li>
                 <li><a href="#cli-tools">CLI Tools</a></li>
-                <li><a href="#skill-runner">Skill Runner</a></li>
+                <li><a href="#goskills-runner">GoSkills Runner</a></li>
                 <li><a href="#mcp-support">MCP Support</a></li>
             </ul>
         </aside>
@@ -90,7 +89,7 @@ func main() {
 # Parse a specific skill
 ./goskills-cli parse ./testdata/skills/artifacts-builder</code></pre>
 
-            <h2 id="skill-runner">Skill Runner</h2>
+            <h2 id="goskills-runner">GoSkills Runner</h2>
             <p>The runner simulates the Claude skill-use workflow. It requires an OpenAI-compatible API key.</p>
             <pre><code>export OPENAI_API_KEY="YOUR_KEY"
 ./goskills run "create an algorithm that generates abstract art"</code></pre>

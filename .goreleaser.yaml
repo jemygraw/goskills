@@ -3,7 +3,7 @@ version: 2
 builds:
   - id: goskills-runner
     binary: goskills
-    main: ./cmd/skill-runner
+    main: ./cmd/goskills
     env:
       - CGO_ENABLED=0
     goos:

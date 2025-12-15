@@ -13,7 +13,8 @@
 
 # Code coverage profiles and other test artifacts
 *.out
-coverage.*
+coverage.html
+coverage.out
 *.coverprofile
 profile.cov
 
@@ -33,14 +34,12 @@ go.work.sum
 
 goskills-cli
 goskills
-agent-cli
-!agent-cli/
-agent-web
-!agent-web/
+!goskills/
 sessions
 
 
 generated
+.claude
 
 # Added by goreleaser init:
 dist/

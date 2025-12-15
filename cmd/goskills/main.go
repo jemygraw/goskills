@@ -93,16 +93,8 @@ You can specify a custom model and API base URL using flags.`,
 			// Check local mcp.json
 			if _, err := os.Stat("mcp.json"); err == nil {
 				mcpConfigPath = "mcp.json"
-			} else {
-				// // Check ~/.claude.json
-				// homeDir, err := os.UserHomeDir()
-				// if err == nil {
-				// 	path := fmt.Sprintf("%s/.claude.json", homeDir)
-				// 	if _, err := os.Stat(path); err == nil {
-				// 		mcpConfigPath = path
-				// 	}
-				// }
 			}
+			// TODO: Check ~/.claude.json if needed in future
 		}
 
 		if mcpConfigPath != "" {
