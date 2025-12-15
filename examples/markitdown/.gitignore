@@ -1,0 +1,61 @@
+# Binaries
+markitdown-example
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Sample/Generated files
+sample.csv
+sample.json
+sample.html
+sample.xml
+*.md
+!README.md
+
+# Converted output
+output/
+converted/
+knowledge_base/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Audio/Video files (if testing)
+*.wav
+*.mp3
+*.mp4
+*.avi
+
+# Image files (if testing)
+*.jpg
+*.jpeg
+*.png
+*.gif
+
+# Archives
+*.zip
+*.tar.gz
+
+# Office documents (if testing)
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+*.epub
