@@ -71,7 +71,7 @@ import (
 )
 
 func main() {
-    skillDirectory := "./examples/skills/artifacts-builder"
+    skillDirectory := "./testdata/skills/artifacts-builder"
     skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
     if err != nil {
         log.Fatalf("Failed to parse skill package: %v", err)
@@ -85,10 +85,10 @@ func main() {
             <h3>Skill Management CLI (goskills-cli)</h3>
             <p>Inspect and manage your local skills.</p>
             <pre><code># List skills
-./goskills-cli list ./examples/skills
+./goskills-cli list ./testdata/skills
 
 # Parse a specific skill
-./goskills-cli parse ./examples/skills/artifacts-builder</code></pre>
+./goskills-cli parse ./testdata/skills/artifacts-builder</code></pre>
 
             <h2 id="skill-runner">Skill Runner</h2>
             <p>The runner simulates the Claude skill-use workflow. It requires an OpenAI-compatible API key.</p>

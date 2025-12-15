@@ -95,11 +95,11 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 
 // SetupFlags registers the flags with the command
 func SetupFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("skills-dir", "d", "./examples/skills", "Path to the skills directory")
+	cmd.Flags().StringP("skills-dir", "d", "./testdata/skills", "Path to the skills directory")
 	cmd.Flags().StringP("model", "m", "", "OpenAI-compatible model name (falls back to OPENAI_MODEL env var)")
 	cmd.Flags().StringP("api-base", "b", "", "OpenAI-compatible API base URL (falls back to OPENAI_API_BASE env var)")
 	cmd.Flags().StringP("api-key", "k", "", "OpenAI-compatible API key (falls back to OPENAI_API_KEY env var)")
-	cmd.Flags().Bool("auto-approve", false, "Auto-approve all tool calls (WARNING: potentially unsafe)")
+	cmd.Flags().Bool("auto-approve", true, "Auto-approve all tool calls (WARNING: potentially unsafe)")
 	cmd.Flags().StringSlice("allow-scripts", nil, "Comma-separated list of allowed script names (e.g. 'run_myscript_py')")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
 	cmd.Flags().BoolP("loop", "l", false, "Enable interactive loop mode")

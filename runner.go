@@ -434,14 +434,6 @@ func (a *Agent) executeToolCall(toolCall openai.ToolCall, scriptMap map[string]s
 		if err == nil {
 			toolOutput = fmt.Sprintf("Successfully wrote to file: %s", params.FilePath)
 		}
-	case "duckduckgo_search":
-		var params struct {
-			Query string `json:"query"`
-		}
-		if err = json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
-			return "", fmt.Errorf("failed to unmarshal duckduckgo_search arguments: %w", err)
-		}
-		toolOutput, err = tool.DuckDuckGoSearch(params.Query)
 	case "wikipedia_search":
 		var params struct {
 			Query string `json:"query"`

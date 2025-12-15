@@ -70,31 +70,31 @@ Here are the available commands for `goskills-cli`:
 #### list
 Lists all valid skills in a given directory.
 ```shell
-./goskills-cli list ./examples/skills
+./goskills-cli list ./testdata/skills
 ```
 
 #### parse
 Parses a single skill and displays a summary of its structure.
 ```shell
-./goskills-cli parse ./examples/skills/artifacts-builder
+./goskills-cli parse ./testdata/skills/artifacts-builder
 ```
 
 #### detail
 Displays the full, detailed information for a single skill, including the complete body content.
 ```shell
-./goskills-cli detail ./examples/skills/artifacts-builder
+./goskills-cli detail ./testdata/skills/artifacts-builder
 ```
 
 #### files
 Lists all the files that make up a skill package.
 ```shell
-./goskills-cli files ./examples/skills/artifacts-builder
+./goskills-cli files ./testdata/skills/artifacts-builder
 ```
 
 #### search
 Searches for skills by name or description within a directory. The search is case-insensitive.
 ```shell
-./goskills-cli search ./examples/skills "web app"
+./goskills-cli search ./testdata/skills "web app"
 ```
 
 ### 2. Skill Runner CLI (`goskills-runner`)
@@ -134,7 +134,7 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 "使用markitdown 工具解析网页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584"
 
 # Example with a custom OpenAI-compatible model and API base URL using command-line flags, in a loop mode and not exit automatically
-./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./examples/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
+./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./testdata/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
 
 ## Library Usage
@@ -153,7 +153,7 @@ import (
 
 func main() {
 	// Path to the skill directory you want to parse
-	skillDirectory := "./examples/skills/artifacts-builder"
+	skillDirectory := "./testdata/skills/artifacts-builder"
 
 	skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
 	if err != nil {
@@ -182,7 +182,7 @@ import (
 
 func main() {
 	// Directory containing all your skills
-	skillsRootDirectory := "./examples/skills"
+	skillsRootDirectory := "./testdata/skills"
 
 	packages, err := goskills.ParseSkillPackages(skillsRootDirectory)
 	if err != nil {

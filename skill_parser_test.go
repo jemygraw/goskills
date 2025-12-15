@@ -217,7 +217,7 @@ allowed-tools: []
 }
 
 func TestParseSkillPackages(t *testing.T) {
-	skills, err := ParseSkillPackages("./examples/skills")
+	skills, err := ParseSkillPackages("./testdata/skills")
 	require.NoError(t, err)
 	// Allow for flexible number of skills as new skills may be added
 	require.Greater(t, len(skills), 25)

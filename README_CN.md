@@ -70,31 +70,31 @@ go build -o goskills-cli ./cmd/skill-cli
 #### list
 列出给定目录中的所有有效技能。
 ```shell
-./goskills-cli list ./examples/skills
+./goskills-cli list ./testdata/skills
 ```
 
 #### parse
 解析单个技能并显示其结构摘要。
 ```shell
-./goskills-cli parse ./examples/skills/artifacts-builder
+./goskills-cli parse ./testdata/skills/artifacts-builder
 ```
 
 #### detail
 显示单个技能的完整详细信息，包括完整的正文内容。
 ```shell
-./goskills-cli detail ./examples/skills/artifacts-builder
+./goskills-cli detail ./testdata/skills/artifacts-builder
 ```
 
 #### files
 列出组成技能包的所有文件。
 ```shell
-./goskills-cli files ./examples/skills/artifacts-builder
+./goskills-cli files ./testdata/skills/artifacts-builder
 ```
 
 #### search
 在目录中按名称或描述搜索技能。搜索不区分大小写。
 ```shell
-./goskills-cli search ./examples/skills "web app"
+./goskills-cli search ./testdata/skills "web app"
 ```
 
 ### 2. 技能运行器 CLI (`goskills-runner`)
@@ -134,7 +134,7 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 "使用markitdown 工具解析网页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584"
 
 # 使用自定义 OpenAI 兼容模型和 API 基础 URL（使用命令行标志），在循环模式下且不自动退出的示例
-./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./examples/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
+./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./testdata/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
 
 ## 库的使用
@@ -153,7 +153,7 @@ import (
 
 func main() {
 	// 你想要解析的技能目录的路径
-	skillDirectory := "./examples/skills/artifacts-builder"
+	skillDirectory := "./testdata/skills/artifacts-builder"
 
 	skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
 	if err != nil {
@@ -182,7 +182,7 @@ import (
 
 func main() {
 	// 包含所有技能的目录
-	skillsRootDirectory := "./examples/skills"
+	skillsRootDirectory := "./testdata/skills"
 
 	packages, err := goskills.ParseSkillPackages(skillsRootDirectory)
 	if err != nil {

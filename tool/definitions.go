@@ -138,23 +138,6 @@ func GetBaseTools() []openai.Tool {
 		{
 			Type: openai.ToolTypeFunction,
 			Function: &openai.FunctionDefinition{
-				Name:        "duckduckgo_search",
-				Description: "Performs a DuckDuckGo search for the given query and returns a summary or related topics.",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"query": map[string]interface{}{
-							"type":        "string",
-							"description": "The search query.",
-						},
-					},
-					"required": []string{"query"},
-				},
-			},
-		},
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
 				Name:        "wikipedia_search",
 				Description: "Performs a search on Wikipedia for the given query and returns a summary of the relevant entry.",
 				Parameters: map[string]interface{}{
