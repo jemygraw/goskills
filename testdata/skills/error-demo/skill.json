@@ -1,0 +1,13 @@
+{
+  "name": "error-demo",
+  "description": "Demonstrates simple error handling by letting LLM see tool errors and recover",
+  "category": "demo",
+  "tags": ["demo", "error"],
+  "prompt": "You are a demonstration skill that shows how the system handles tool errors gracefully. When a tool fails, you'll receive detailed error information and can decide how to recover.",
+  "tools": [
+    "read_file",
+    "write_file",
+    "run_shell_code"
+  ],
+  "resources": []
+}

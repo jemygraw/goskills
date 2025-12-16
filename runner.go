@@ -276,7 +276,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 	var finalResponse strings.Builder
 
-	for i := 0; i < 10; i++ { // Limit to 10 iterations to prevent infinite loops
+	for i := 0; i < 20; i++ { // Limit to 10 iterations to prevent infinite loops
 		req := openai.ChatCompletionRequest{
 			Model:    a.cfg.Model,
 			Messages: a.messages, // Use agent's messages
@@ -348,10 +348,13 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 			if err != nil {
 				log.Error("tool call failed: %v", err)
+				// Provide detailed error information to help LLM understand what went wrong
+				errorMsg := fmt.Sprintf("Tool execution failed: %s\nError details: %v\nTool name: %s\nArguments: %s\n\nYou can try:\n1. Retry with different parameters\n2. Use a different tool\n3. Modify your approach",
+					tc.Function.Name, err, tc.Function.Name, tc.Function.Arguments)
 				a.messages = append(a.messages, openai.ChatCompletionMessage{
 					Role:       openai.ChatMessageRoleTool,
 					ToolCallID: tc.ID,
-					Content:    fmt.Sprintf("Error: %v", err),
+					Content:    errorMsg,
 				})
 			} else {
 				a.messages = append(a.messages, openai.ChatCompletionMessage{

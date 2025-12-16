@@ -1,0 +1,14 @@
+{
+  "name": "failure-test",
+  "description": "Test skill for failure resolution",
+  "category": "testing",
+  "tags": ["test", "failure"],
+  "prompt": "You are a test skill that demonstrates failure resolution capabilities. You can call various tools that might fail to test the intelligent retry system.",
+  "tools": [
+    "read_file",
+    "run_shell_code",
+    "tavily_search",
+    "web_fetch"
+  ],
+  "resources": []
+}
