@@ -724,7 +724,7 @@ func TestContinueSkillWithTools_WithToolCalls(t *testing.T) {
 // TestContinueSkillWithTools_MaxIterations tests that the function stops after max iterations
 func TestContinueSkillWithTools_MaxIterations(t *testing.T) {
 	// Create responses that always return tool calls (infinite loop scenario)
-	mockResponses := make([]openai.ChatCompletionResponse, 15)
+	mockResponses := make([]openai.ChatCompletionResponse, 25)
 	for i := range mockResponses {
 		mockResponses[i] = openai.ChatCompletionResponse{
 			Choices: []openai.ChatCompletionChoice{

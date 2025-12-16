@@ -276,7 +276,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 	var finalResponse strings.Builder
 
-	for i := 0; i < 20; i++ { // Limit to 10 iterations to prevent infinite loops
+	for i := 0; i < 20; i++ { // Limit to 20 iterations to prevent infinite loops
 		req := openai.ChatCompletionRequest{
 			Model:    a.cfg.Model,
 			Messages: a.messages, // Use agent's messages
@@ -306,7 +306,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 				var input string
 				if _, err := fmt.Scanln(&input); err != nil {
 					// Handle scan error, default to denying
-					fmt.Println("\n❌ Tool execution denied due to input error.")
+					log.Error("tool execution denied due to input error: %v", err)
 					a.messages = append(a.messages, openai.ChatCompletionMessage{
 						Role:       openai.ChatMessageRoleTool,
 						ToolCallID: tc.ID,
@@ -315,7 +315,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 					continue
 				}
 				if strings.ToLower(strings.TrimSpace(input)) != "y" {
-					fmt.Println("❌ Tool execution denied by user.")
+					log.Info("tool execution denied by user: %s", tc.Function.Name)
 					a.messages = append(a.messages, openai.ChatCompletionMessage{
 						Role:       openai.ChatMessageRoleTool,
 						ToolCallID: tc.ID,
@@ -349,7 +349,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 			if err != nil {
 				log.Error("tool call failed: %v", err)
 				// Provide detailed error information to help LLM understand what went wrong
-				errorMsg := fmt.Sprintf("Tool execution failed: %s\nError details: %v\nTool name: %s\nArguments: %s\n\nYou can try:\n1. Retry with different parameters\n2. Use a different tool\n3. Modify your approach",
+				errorMsg := fmt.Sprintf("Tool execution failed: %s\nError details: %v\nTool name: %s\nArguments: %s\n\nYou can try:\n1. Retry with different parameters\n2. Use a different tool to fix it\n3. Modify your approach",
 					tc.Function.Name, err, tc.Function.Name, tc.Function.Arguments)
 				a.messages = append(a.messages, openai.ChatCompletionMessage{
 					Role:       openai.ChatMessageRoleTool,
