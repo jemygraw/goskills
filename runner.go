@@ -262,6 +262,8 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 	availableTools, scriptMap := GenerateToolDefinitions(skill)
 
+	availableTools = append(availableTools, tool.GetBaseTools()...)
+
 	// Add MCP tools if client is available
 	if a.mcpClient != nil {
 		mcpTools, err := a.mcpClient.GetTools(ctx)
