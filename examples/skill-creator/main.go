@@ -75,7 +75,7 @@ The skill should help optimize images for web use by:
 			fmt.Printf("Result:\n%s\n\n", result3)
 		}
 	} else {
-		fmt.Println("=== Example 2 & 3: Skipped (skill not created) ===\n")
+		fmt.Println("=== Example 2 & 3: Skipped (skill not created) ===")
 	}
 
 	// Example 4: Create a database skill

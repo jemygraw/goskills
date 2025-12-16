@@ -19,6 +19,11 @@ func TavilySearch(query string) (string, error) {
 // TavilySearchWithLimit performs a web search using the Tavily API with a custom result limit.
 // TavilySearchWithLimit performs a web search using the Tavily API with a custom result limit.
 func TavilySearchWithLimit(query string, maxResults int) (string, error) {
+	return TavilySearchWithLimitAndURL(query, maxResults, "https://api.tavily.com/search")
+}
+
+// TavilySearchWithLimitAndURL performs a web search using the Tavily API with a custom result limit and URL (for testing)
+func TavilySearchWithLimitAndURL(query string, maxResults int, apiURL string) (string, error) {
 	apiKey := os.Getenv("TAVILY_API_KEY")
 	if apiKey == "" {
 		return "", fmt.Errorf("TAVILY_API_KEY environment variable is not set")
@@ -41,7 +46,7 @@ func TavilySearchWithLimit(query string, maxResults int) (string, error) {
 		return "", fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), "POST", "https://api.tavily.com/search", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", apiURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}

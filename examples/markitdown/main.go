@@ -62,7 +62,7 @@ func main() {
 			fmt.Printf("Result:\n%s\n\n", result2)
 		}
 	} else {
-		fmt.Println("Skipped: ../pdf/Hello_World.pdf not found\n")
+		fmt.Println("Skipped: ../pdf/Hello_World.pdf not found")
 	}
 
 	// Example 3: Create a sample CSV and convert it to Markdown table

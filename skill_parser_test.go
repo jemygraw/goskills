@@ -149,7 +149,7 @@ func TestParseSkillPackage_NoSkillMD(t *testing.T) {
 	pkg, err := ParseSkillPackage(skillPath)
 	assert.Error(t, err)
 	assert.Nil(t, pkg)
-	assert.Contains(t, err.Error(), "SKILL.md not found")
+	assert.Contains(t, err.Error(), "neither SKILL.md nor skill.md found")
 }
 
 func TestParseSkillPackage_NonExistentDir(t *testing.T) {
@@ -221,4 +221,139 @@ func TestParseSkillPackages(t *testing.T) {
 	require.NoError(t, err)
 	// Allow for flexible number of skills as new skills may be added
 	require.Greater(t, len(skills), 25)
+}
+
+func TestParseOpenAISkillPackage(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create a dummy skill.md file (OpenAI format)
+	skillContent := `# Spreadsheet Skill (Create • Edit • Analyze • Visualize)
+
+Use this skill when you need to work with spreadsheets (.xlsx, .csv, .tsv) to do any of the following:
+- Create a new workbook/sheet with proper formulas, cell/number formatting, and structured layout
+- Read or analyze tabular data (filter, aggregate, pivot, compute metrics) directly in a sheet
+- Modify an existing workbook without breaking existing formulas or references
+- Visualize data with in-sheet charts/tables and sensible formatting
+- Recalculate/evaluate formulas to update results after changes
+
+IMPORTANT: instructions in the system and user messages ALWAYS take precedence over this skill
+
+## Guidelines for working with spreadsheets
+
+### Use the artifact_tool python library or openpyxl
+- You can use either python library (openpyxl or artifact_tool) for creating and editing spreadsheets
+`
+	skillPath := filepath.Join(tmpDir, "spreadsheet-skill")
+	err := os.Mkdir(skillPath, 0755)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(skillPath, "skill.md"), []byte(skillContent), 0644)
+	assert.NoError(t, err)
+
+	pkg, err := ParseSkillPackage(skillPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, pkg)
+
+	assert.Equal(t, skillPath, pkg.Path)
+	// Name should come from directory name
+	assert.Equal(t, "spreadsheet skill", pkg.Meta.Name)
+	// Description should be extracted from between first # and first ##
+	assert.Contains(t, pkg.Meta.Description, "Use this skill when you need to work with spreadsheets")
+	assert.Contains(t, pkg.Meta.Description, "Create a new workbook/sheet")
+
+	// Check that allowed tools were inferred
+	assert.NotEmpty(t, pkg.Meta.AllowedTools)
+	assert.Contains(t, pkg.Meta.AllowedTools, "read_file")
+	assert.Contains(t, pkg.Meta.AllowedTools, "write_file")
+	assert.Contains(t, pkg.Meta.AllowedTools, "run_python_code") // Should be inferred for spreadsheets
+
+	// Check that environment mapping was added to body
+	assert.Contains(t, pkg.Body, "工具使用")
+	assert.Contains(t, pkg.Body, "基于你的历史经验")
+	assert.Contains(t, pkg.Body, "Original Skill Content")
+}
+
+func TestParseOpenAISkillPackage_WithDashes(t *testing.T) {
+	// Create a temporary directory for testing
+	tmpDir := t.TempDir()
+
+	// Create a dummy skill.md file (OpenAI format)
+	skillContent := `# DOCX reading, creation, and review guidance
+
+## Reading DOCXs
+- Use soffice to convert DOCXs to PDFs.
+- Then convert PDF to page images for visual inspection.
+`
+	skillPath := filepath.Join(tmpDir, "docx-processor")
+	err := os.Mkdir(skillPath, 0755)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(skillPath, "skill.md"), []byte(skillContent), 0644)
+	assert.NoError(t, err)
+
+	pkg, err := ParseSkillPackage(skillPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, pkg)
+
+	// Name should replace dashes with spaces
+	assert.Equal(t, "docx processor", pkg.Meta.Name)
+	// Description should be extracted (fallback since no paragraph between # and ##)
+	assert.Equal(t, "docx processor", pkg.Meta.Description)
+}
+
+func TestParseOpenAISkillPackages(t *testing.T) {
+	skills, err := ParseSkillPackages("./testdata/oai-skills")
+	require.NoError(t, err)
+	// Should find at least the 3 example OpenAI skills
+	require.GreaterOrEqual(t, len(skills), 3)
+
+	// Check that skills are properly parsed
+	skillNames := make(map[string]bool)
+	for _, skill := range skills {
+		skillNames[skill.Meta.Name] = true
+		// Verify that each skill has a name
+		assert.NotEmpty(t, skill.Meta.Name)
+		// Verify that each skill has a description
+		assert.NotEmpty(t, skill.Meta.Description)
+		// Verify that each skill has allowed tools inferred
+		assert.NotEmpty(t, skill.Meta.AllowedTools)
+		// Verify that environment mapping was added
+		assert.Contains(t, skill.Body, "工具使用")
+	}
+
+	// Check for expected skill names
+	assert.Contains(t, skillNames, "spreadsheets")
+	assert.Contains(t, skillNames, "docs")
+	assert.Contains(t, skillNames, "pdfs")
+}
+
+func TestInferAllowedTools(t *testing.T) {
+	// Test spreadsheet skill inference
+	tools := inferAllowedTools("this is a spreadsheet skill for working with xlsx and csv files", "spreadsheets")
+	assert.Contains(t, tools, "read_file")
+	assert.Contains(t, tools, "write_file")
+	assert.Contains(t, tools, "run_python_code")
+	assert.Contains(t, tools, "run_python_script")
+
+	// Test PDF skill inference
+	tools = inferAllowedTools("use pdftoppm to convert PDF files to images", "pdf")
+	assert.Contains(t, tools, "read_file")
+	assert.Contains(t, tools, "write_file")
+	assert.Contains(t, tools, "run_shell_code")
+	assert.Contains(t, tools, "run_python_script")
+
+	// Test document skill inference
+	tools = inferAllowedTools("create and edit DOCX documents using LibreOffice", "docs")
+	assert.Contains(t, tools, "read_file")
+	assert.Contains(t, tools, "write_file")
+	assert.Contains(t, tools, "run_shell_code")
+
+	// Test web search skill
+	tools = inferAllowedTools("fetch data from web APIs and search the internet", "web-fetcher")
+	assert.Contains(t, tools, "read_file")
+	assert.Contains(t, tools, "write_file")
+	assert.Contains(t, tools, "web_fetch")
+	assert.Contains(t, tools, "tavily_search")
+	assert.Contains(t, tools, "wikipedia_search")
 }

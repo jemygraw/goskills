@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -44,6 +45,12 @@ func extractFrontmatterAndBody(data []byte) (SkillMeta, string, error) {
 	var meta SkillMeta
 	var body string
 
+	// Check if content starts with frontmatter marker
+	content := string(data)
+	if !strings.HasPrefix(strings.TrimSpace(content), "---") {
+		return meta, "", fmt.Errorf("no YAML frontmatter found or format is incorrect")
+	}
+
 	parts := bytes.SplitN(data, marker, 3)
 	if len(parts) < 3 {
 		return meta, "", fmt.Errorf("no YAML frontmatter found or format is incorrect")
@@ -58,6 +65,132 @@ func extractFrontmatterAndBody(data []byte) (SkillMeta, string, error) {
 	body = strings.TrimSpace(string(parts[2]))
 
 	return meta, body, nil
+}
+
+// parseOpenAISkill parses an OpenAI skill.md file without frontmatter
+// The skill name comes from the directory name
+// The description is extracted from between the first # heading and the first ## heading
+func parseOpenAISkill(skillDir string, data []byte) (SkillMeta, string, error) {
+	content := string(data)
+	var meta SkillMeta
+	var body string
+
+	// Extract skill name from directory path
+	dirName := filepath.Base(skillDir)
+	meta.Name = strings.ReplaceAll(dirName, "-", " ")
+	meta.Name = strings.ReplaceAll(meta.Name, "_", " ")
+	// Don't convert to singular for OpenAI skills, as directory names are already proper
+
+	// Use regex to find description between first # heading and first ## heading
+	// Pattern: content after first # heading until before first ## heading
+	descRegex := regexp.MustCompile(`(?s)^#\s+.*?\n\n(.*?)\n##`)
+	matches := descRegex.FindStringSubmatch(content)
+
+	if len(matches) > 1 {
+		// Clean up the description
+		description := strings.TrimSpace(matches[1])
+		// Remove extra whitespace and newlines
+		description = regexp.MustCompile(`\s+`).ReplaceAllString(description, " ")
+		meta.Description = description
+	} else {
+		// Fallback: extract first paragraph after the first # heading
+		lines := strings.Split(content, "\n")
+		inFirstSection := false
+		var descLines []string
+
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "# ") && !inFirstSection {
+				inFirstSection = true
+				continue
+			}
+			if inFirstSection {
+				if strings.HasPrefix(line, "##") || strings.HasPrefix(line, "# ") {
+					break
+				}
+				if line != "" {
+					descLines = append(descLines, line)
+				}
+			}
+		}
+
+		if len(descLines) > 0 {
+			meta.Description = strings.Join(descLines, " ")
+		} else {
+			meta.Description = meta.Name
+		}
+	}
+
+	// Determine appropriate allowed tools based on skill content
+	meta.AllowedTools = inferAllowedTools(content, dirName)
+
+	// Prepend environment mapping information for OpenAI skills
+	envMapping := `## 工具使用
+你需要搜索相应的工具使用方法决定如何使用工具：
+- 基于你的历史经验
+- 搜索工具的官方文档
+- 查看工具的help信息
+
+## Original Skill Content
+
+` + content
+
+	// The modified content with environment mappings
+	body = envMapping
+
+	return meta, body, nil
+}
+
+// inferAllowedTools analyzes skill content to determine what tools are likely needed
+func inferAllowedTools(content, skillName string) []string {
+	content = strings.ToLower(content)
+	var tools []string
+
+	// Always include basic file operations
+	tools = append(tools, "read_file", "write_file")
+
+	// Check for spreadsheet needs
+	if strings.Contains(skillName, "spreadsheet") || strings.Contains(content, "spreadsheet") ||
+		strings.Contains(content, "xlsx") || strings.Contains(content, "csv") {
+		tools = append(tools, "run_python_code")
+		tools = append(tools, "run_python_script")
+	}
+
+	// Check for PDF processing
+	if strings.Contains(skillName, "pdf") || strings.Contains(content, "pdf") {
+		tools = append(tools, "run_shell_code")
+		tools = append(tools, "run_python_script")
+	}
+
+	// Check for document processing
+	if strings.Contains(skillName, "docx") || strings.Contains(content, "docx") ||
+		strings.Contains(content, "document") {
+		tools = append(tools, "run_shell_code")
+	}
+
+	// Check for web/data fetching needs
+	if strings.Contains(content, "fetch") || strings.Contains(content, "search") ||
+		strings.Contains(content, "web") || strings.Contains(content, "api") {
+		tools = append(tools, "web_fetch", "tavily_search", "wikipedia_search")
+	}
+
+	// Check for shell/execution needs
+	if strings.Contains(content, "command") || strings.Contains(content, "execute") ||
+		strings.Contains(content, "install") || strings.Contains(content, "pip") {
+		tools = append(tools, "run_shell_code", "run_shell_script")
+	}
+
+	// Remove duplicates while preserving order
+	seen := make(map[string]bool)
+	var result []string
+	for _, tool := range tools {
+		if !seen[tool] {
+			seen[tool] = true
+			result = append(result, tool)
+		}
+	}
+
+	return result
 }
 
 // findResourceFiles finds all files in the specified resource directory
@@ -101,19 +234,55 @@ func ParseSkillPackage(dirPath string) (*SkillPackage, error) {
 		return nil, fmt.Errorf("path is not a directory: %s", dirPath)
 	}
 
-	// 1. Parse SKILL.md
-	skillMdPath := filepath.Join(dirPath, "SKILL.md")
-	mdContent, err := os.ReadFile(skillMdPath)
+	// 1. Parse skill file - try both SKILL.md (Claude) and skill.md (OpenAI)
+	var meta SkillMeta
+	var bodyStr string
+	var mdContent []byte
+
+	// Check what files actually exist (to handle case-insensitive filesystems)
+	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("SKILL.md not found in skill directory: %s", dirPath)
-		}
-		return nil, fmt.Errorf("failed to read SKILL.md: %w", err)
+		return nil, fmt.Errorf("failed to read skill directory: %w", err)
 	}
 
-	meta, bodyStr, err := extractFrontmatterAndBody(mdContent)
-	if err != nil {
-		return nil, err
+	hasClaudeSkill := false
+	hasOpenAISkill := false
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			name := entry.Name()
+			if name == "SKILL.md" {
+				hasClaudeSkill = true
+			} else if name == "skill.md" {
+				hasOpenAISkill = true
+			}
+		}
+	}
+
+	if hasClaudeSkill {
+		// Claude skill format with frontmatter
+		skillMdPath := filepath.Join(dirPath, "SKILL.md")
+		mdContent, err = os.ReadFile(skillMdPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read SKILL.md: %w", err)
+		}
+		meta, bodyStr, err = extractFrontmatterAndBody(mdContent)
+		if err != nil {
+			return nil, err
+		}
+	} else if hasOpenAISkill {
+		// OpenAI skill format without frontmatter
+		skillMdPath := filepath.Join(dirPath, "skill.md")
+		mdContent, err = os.ReadFile(skillMdPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read skill.md: %w", err)
+		}
+		meta, bodyStr, err = parseOpenAISkill(dirPath, mdContent)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, fmt.Errorf("neither SKILL.md nor skill.md found in skill directory: %s", dirPath)
 	}
 
 	// 2. Find resource files
@@ -152,7 +321,7 @@ func ParseSkillPackage(dirPath string) (*SkillPackage, error) {
 }
 
 // ParseSkillPackages finds all skill packages in a given directory and its subdirectories.
-// A directory is considered a skill package if it contains a SKILL.md file.
+// A directory is considered a skill package if it contains either a SKILL.md (Claude) or skill.md (OpenAI) file.
 // It returns a slice of successfully parsed SkillPackage objects.
 
 func ParseSkillPackages(rootDir string) ([]*SkillPackage, error) {
@@ -163,7 +332,7 @@ func ParseSkillPackages(rootDir string) ([]*SkillPackage, error) {
 			return err
 		}
 
-		if !d.IsDir() && d.Name() == "SKILL.md" {
+		if !d.IsDir() && (d.Name() == "SKILL.md" || d.Name() == "skill.md") {
 			dir := filepath.Dir(path)
 			skillDirs[dir] = struct{}{}
 		}

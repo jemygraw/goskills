@@ -67,7 +67,7 @@ func main() {
 			fmt.Printf("Result:\n%s\n\n", result2)
 		}
 	} else {
-		fmt.Println("=== Example 2: Skipped (report.docx not found) ===\n")
+		fmt.Println("=== Example 2: Skipped (report.docx not found) ===")
 	}
 
 	// Example 3: Create a professional document with formatting
