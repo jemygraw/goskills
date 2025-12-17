@@ -3,10 +3,12 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sashabaranov/go-openai"
@@ -14,13 +16,22 @@ import (
 
 // Client manages connections to multiple MCP servers.
 type Client struct {
-	sessions map[string]*mcp.ClientSession
+	sessions   map[string]*mcp.ClientSession
+	config     *Config
+	maxRetries int
 }
 
 // NewClient creates a new MCP client and connects to the servers defined in the config.
 func NewClient(ctx context.Context, config *Config) (*Client, error) {
+	maxRetries := config.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3 // Default to 3 retries
+	}
+
 	c := &Client{
-		sessions: make(map[string]*mcp.ClientSession),
+		sessions:   make(map[string]*mcp.ClientSession),
+		config:     config,
+		maxRetries: maxRetries,
 	}
 
 	for name, server := range config.MCPServers {
@@ -132,7 +143,7 @@ func (c *Client) GetTools(ctx context.Context) ([]openai.Tool, error) {
 	return allTools, nil
 }
 
-// CallTool calls a tool on the appropriate server.
+// CallTool calls a tool on the appropriate server with retry and reconnection support.
 // The tool name is expected to be in the format "serverName__toolName".
 func (c *Client) CallTool(ctx context.Context, name string, args map[string]interface{}) (interface{}, error) {
 	serverName, toolName, err := parseToolName(name)
@@ -140,20 +151,69 @@ func (c *Client) CallTool(ctx context.Context, name string, args map[string]inte
 		return nil, err
 	}
 
-	session, ok := c.sessions[serverName]
+	server, ok := c.config.MCPServers[serverName]
 	if !ok {
-		return nil, fmt.Errorf("server %s not found", serverName)
+		return nil, fmt.Errorf("server %s not found in config", serverName)
 	}
 
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name:      toolName,
-		Arguments: args,
-	})
-	if err != nil {
+	for i := 0; i < c.maxRetries; i++ {
+		session, ok := c.sessions[serverName]
+		if !ok {
+			return nil, fmt.Errorf("server %s session not found", serverName)
+		}
+
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name:      toolName,
+			Arguments: args,
+		})
+
+		if err == nil {
+			return result, nil
+		}
+
+		// Check if it's a connection-related error
+		if c.isConnectionError(err) {
+			log.Printf("Connection error detected for server %s, attempting reconnection (%d/%d): %v",
+				serverName, i+1, c.maxRetries, err)
+
+			// Close the old session
+			if session != nil {
+				session.Close()
+			}
+
+			// Wait with exponential backoff before reconnecting
+			if i < c.maxRetries-1 {
+				backoff := time.Second * time.Duration(i+1)
+				log.Printf("Waiting %v before reconnecting...", backoff)
+				time.Sleep(backoff)
+
+				// Attempt to reconnect
+				if reconnectErr := c.connectToServer(ctx, serverName, server); reconnectErr != nil {
+					log.Printf("Reconnection failed: %v", reconnectErr)
+					continue
+				}
+				log.Printf("Reconnection successful for server %s", serverName)
+				continue
+			}
+		}
+
+		// For non-connection errors, return immediately
 		return nil, fmt.Errorf("failed to call tool: %w", err)
 	}
 
-	return result, nil
+	return nil, fmt.Errorf("failed to call tool after %d retries", c.maxRetries)
+}
+
+// isConnectionError checks if an error is related to connection issues
+func (c *Client) isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "connection closed") ||
+		strings.Contains(errMsg, "EOF") ||
+		strings.Contains(errMsg, "broken pipe") ||
+		strings.Contains(errMsg, "connection reset")
 }
 
 func parseToolName(name string) (string, string, error) {

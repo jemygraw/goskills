@@ -9,6 +9,7 @@ import (
 // Config represents the structure of the ~/.claude.json file.
 type Config struct {
 	MCPServers map[string]MCPServer `json:"mcpServers"`
+	MaxRetries int                  `json:"maxRetries,omitempty"` // Default retry count for tool calls
 }
 
 // MCPServer represents a single MCP server configuration.
