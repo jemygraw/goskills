@@ -10,9 +10,12 @@ A powerful command-line tool to parse, manage, and execute Claude Skill packages
 
 - **Skill Management**: List, search, parse, and inspect Claude skills from local directories
 - **Runtime Execution**: Execute skills with LLM integration (OpenAI, Claude, and compatible APIs)
+- **Web Interface**: Interactive chat UI with real-time updates, session replay, and rich artifact rendering (PPT, Podcasts)
+- **Rich Content Generation**: Generate PowerPoint presentations (via Slidev) and Podcast audio
+- **Deep Research**: Recursive analysis and self-correction capabilities for in-depth investigation
 - **Built-in Tools**: Shell commands, Python execution, file operations, web fetching, and search
 - **MCP Support**: Model Context Protocol (MCP) server integration
-- **Dual CLI Tools**: Separate tools for skill management and execution
+- **Internationalization**: Full support for English and Chinese languages
 - **Comprehensive Testing**: Full test suite with coverage reports
 
 ## Installation
@@ -47,10 +50,13 @@ brew install goskills
 # Set your OpenAI API key
 export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
+# Start the Web Interface
+./agent-web
+
 # List available skills
 ./goskills-cli list ./skills
 
-# Run a skill
+# Run a skill using the runner
 ./goskills run "create a react component for a todo app"
 ```
 
@@ -67,9 +73,17 @@ GoSkills includes a comprehensive set of built-in tools for skill execution:
 
 ## CLI Tools
 
-GoSkills provides two command-line tools for different purposes:
+GoSkills provides a suite of tools for different purposes:
 
-### 1. Skill Management CLI (`goskills-cli`)
+### 1. Web Interface (`agent-web`)
+
+A modern web-based interface for interacting with GoSkills agents.
+- **Chat**: Real-time conversation with agents.
+- **Artifacts**: View generated Reports, PPTs, and Podcasts directly in the browser.
+- **History**: Replay and review past sessions.
+- **Localization**: Toggle between English and Chinese interfaces.
+
+### 2. Skill Management CLI (`goskills-cli`)
 
 Located in `cmd/goskills-cli`, this tool helps you inspect and manage your local Claude skills.
 
@@ -83,37 +97,13 @@ go build -o goskills-cli ./cmd/goskills-cli
 
 #### Available Commands
 
-#### list
-Lists all valid skills in a given directory.
-```shell
-./goskills-cli list ./testdata/skills
-```
+- **list**: Lists all valid skills in a given directory.
+- **parse**: Parses a single skill and displays a summary of its structure.
+- **detail**: Displays the full, detailed information for a single skill.
+- **files**: Lists all the files that make up a skill package.
+- **search**: Searches for skills by name or description.
 
-#### parse
-Parses a single skill and displays a summary of its structure.
-```shell
-./goskills-cli parse ./testdata/skills/artifacts-builder
-```
-
-#### detail
-Displays the full, detailed information for a single skill, including the complete body content.
-```shell
-./goskills-cli detail ./testdata/skills/artifacts-builder
-```
-
-#### files
-Lists all the files that make up a skill package.
-```shell
-./goskills-cli files ./testdata/skills/artifacts-builder
-```
-
-#### search
-Searches for skills by name or description within a directory. The search is case-insensitive.
-```shell
-./goskills-cli search ./testdata/skills "web app"
-```
-
-### 2. Skill Runner CLI (`goskills`)
+### 3. Skill Runner CLI (`goskills`)
 
 Located in `cmd/goskills`, this tool simulates the Claude skill-use workflow by integrating with Large Language Models (LLMs) like OpenAI's models.
 
@@ -128,7 +118,7 @@ go build -o goskills ./cmd/goskills
 #### Available Commands
 
 #### run
-Processes a user request by first discovering available skills, then asking an LLM to select the most appropriate one, and finally executing the selected skill by feeding its content to the LLM as a system prompt.
+Processes a user request by first discovering available skills, then asking an LLM to select the most appropriate one, and finally executing the selected skill.
 
 **Requires the `OPENAI_API_KEY` environment variable to be set.**
 
@@ -153,7 +143,6 @@ export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 # Example with a custom OpenAI-compatible model and API base URL using command-line flags, in a loop mode and not exit automatically
 ./goskills run --auto-approve --model deepseek-v3 --api-base https://qianfan.baidubce.com/v2 --skills-dir=./testdata/skills "使用markitdown 工具解析网 页 https://baike.baidu.com/item/%E5%AD%94%E5%AD%90/1584" -l
 ```
-
 
 ## Development
 

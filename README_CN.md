@@ -12,9 +12,12 @@
 
 - **技能管理**: 从本地目录列出、搜索、解析和检查 Claude 技能
 - **运行时执行**: 通过 LLM 集成执行技能（OpenAI、Claude 和兼容 API）
+- **Web 界面**: 交互式聊天 UI，支持实时更新、会话回放和丰富的工件渲染（PPT、播客）
+- **富内容生成**: 生成 PowerPoint 演示文稿（通过 Slidev）和播客音频
+- **深度研究**: 用于深度调查的递归分析和自我纠正能力
 - **内置工具**: Shell 命令、Python 执行、文件操作、web 获取和搜索
 - **MCP 支持**: 模型上下文协议 (MCP) 服务器集成
-- **双 CLI 工具**: 分别用于技能管理和执行的工具
+- **国际化**: 全面支持英文和中文
 - **全面测试**: 完整的测试套件和覆盖率报告
 
 ## 安装
@@ -49,6 +52,9 @@ brew install goskills
 # 设置你的 OpenAI API 密钥
 export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
+# 启动 Web 界面
+./agent-web
+
 # 列出可用技能
 ./goskills-cli list ./skills
 
@@ -69,9 +75,17 @@ GoSkills 包含一套全面的内置工具，用于技能执行：
 
 ## CLI 工具
 
-GoSkills 提供两个用于不同目的的命令行工具：
+GoSkills 提供用于不同目的的工具套件：
 
-### 1. 技能管理 CLI (`goskills-cli`)
+### 1. Web 界面 (`agent-web`)
+
+用于与 GoSkills Agent 交互的现代 Web 界面。
+- **聊天**: 与 Agent 进行实时对话。
+- **工件**: 直接在浏览器中查看生成的报告、PPT 和播客。
+- **历史**: 回放和查看过去的会话。
+- **本地化**: 在英文和中文界面之间切换。
+
+### 2. 技能管理 CLI (`goskills-cli`)
 
 位于 `cmd/goskills-cli`，此工具帮助你检查和管理本地 Claude 技能。
 
@@ -85,37 +99,13 @@ go build -o goskills-cli ./cmd/goskills-cli
 
 #### 可用命令
 
-#### list
-列出给定目录中的所有有效技能。
-```shell
-./goskills-cli list ./testdata/skills
-```
+- **list**: 列出给定目录中的所有有效技能。
+- **parse**: 解析单个技能并显示其结构摘要。
+- **detail**: 显示单个技能的完整详细信息，包括完整的正文内容。
+- **files**: 列出组成技能包的所有文件。
+- **search**: 在目录中按名称或描述搜索技能。
 
-#### parse
-解析单个技能并显示其结构摘要。
-```shell
-./goskills-cli parse ./testdata/skills/artifacts-builder
-```
-
-#### detail
-显示单个技能的完整详细信息，包括完整的正文内容。
-```shell
-./goskills-cli detail ./testdata/skills/artifacts-builder
-```
-
-#### files
-列出组成技能包的所有文件。
-```shell
-./goskills-cli files ./testdata/skills/artifacts-builder
-```
-
-#### search
-在目录中按名称或描述搜索技能。搜索不区分大小写。
-```shell
-./goskills-cli search ./testdata/skills "web app"
-```
-
-### 2. 技能运行器 CLI (`goskills`)
+### 3. 技能运行器 CLI (`goskills`)
 
 位于 `cmd/goskills`，此工具通过集成像 OpenAI 模型这样的大型语言模型 (LLM) 来模拟 Claude 技能使用工作流。
 
