@@ -13,12 +13,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is the version of the tool, set at build time
+var Version = "v0.4.3"
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "goskills-runner",
+	Use:   "goskills",
 	Short: "A CLI tool for running Claude skills with LLMs.",
-	Long: `goskills-runner is a command-line interface to help you execute Claude Skill packages
+	Long: `goskills is a command-line interface to help you execute Claude Skill packages
 using Large Language Models (LLMs) like OpenAI's GPT models.`,
+	Version: Version,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

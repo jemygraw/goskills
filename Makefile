@@ -15,6 +15,10 @@ BUILD_DIR=.
 COVERAGE_FILE=coverage.out
 COVERAGE_HTML=coverage.html
 
+# Versioning
+VERSION ?= $(shell git describe --tags --always 2>/dev/null || echo "dev")
+LDFLAGS=-ldflags "-X main.Version=$(VERSION)"
+
 # Colors for terminal output
 COLOR_RESET=\033[0m
 COLOR_BOLD=\033[1m
@@ -43,12 +47,12 @@ build: cli runner
 ## cli: Build CLI binary
 cli:
 	@echo "$(COLOR_BLUE)Building CLI...$(COLOR_RESET)"
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_CLI) ./cmd/goskills-cli
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) ./cmd/goskills-cli
 
 ## runner: Build runner binary
 runner:
 	@echo "$(COLOR_BLUE)Building runner...$(COLOR_RESET)"
-	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_RUNNER) ./cmd/goskills
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_RUNNER) ./cmd/goskills
 
 ## test: Run all tests
 test:

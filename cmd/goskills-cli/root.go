@@ -7,11 +7,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is the version of the tool, set at build time
+var Version = "v0.1.0"
+
 var rootCmd = &cobra.Command{
 	Use:   "goskills-cli",
 	Short: "A CLI tool for creating and managing Claude skills.",
 	Long: `goskills-cli is a command-line interface to help you develop, parse,
 and manage Claude Skill packages.`,
+	Version: Version,
 	CompletionOptions: cobra.CompletionOptions{
 		DisableDefaultCmd: true,
 	},
