@@ -1,0 +1,17 @@
+{
+  "company": "Tech Corp",
+  "employees": [
+    {
+      "name": "John Doe",
+      "role": "Software Engineer",
+      "skills": ["Python", "Go", "JavaScript"]
+    },
+    {
+      "name": "Jane Smith",
+      "role": "Product Manager",
+      "skills": ["Strategy", "Communication", "Analytics"]
+    }
+  ],
+  "founded": 2020,
+  "locations": ["San Francisco", "New York", "London"]
+}
