@@ -117,6 +117,23 @@ go build -o goskills ./cmd/goskills
 
 #### Available Commands
 
+#### download
+Downloads a skill package from a GitHub directory URL to `~/.goskills/skills`.
+
+```shell
+# Download a skill from GitHub
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer
+
+# Download a skill with subdirectories
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/artifacts-builder
+```
+
+The download command will:
+- Automatically create the `~/.goskills/skills` directory if it doesn't exist
+- Recursively download all files and subdirectories
+- Extract the skill name from the URL and use it as the target directory name
+- Prevent duplicate downloads with error messages
+
 #### run
 Processes a user request by first discovering available skills, then asking an LLM to select the most appropriate one, and finally executing the selected skill.
 

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - GoSkills</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.gstatic.cn" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/7.0.1/css/all.min.css/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="logo">
+                <i class="fa-solid fa-cube"></i>
+                <span>GoSkills</span>
+            </a>
+            <div class="menu-toggle">
+                <i class="fa-solid fa-bars"></i>
+            </div>
+            <nav class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="documentation.html" class="active">Documentation</a>
+                <a href="usage.html">Integration</a>
+                <a href="examples.html">Examples</a>
+                <a href="https://github.com/smallnest/goskills" target="_blank"><i class="fa-brands fa-github"></i>
+                    GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="docs-container">
+        <aside class="docs-sidebar">
+            <ul>
+                <li><a href="#introduction" class="active">Introduction</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#goskills-runner">GoSkills Runner</a></li>
+                <li><a href="#goskills-download">Download Command</a></li>
+                <li><a href="#goskills-cli">GoSkills Parser CLI</a></li>
+                <li><a href="#library-usage">Library Usage</a></li>
+                <li><a href="#mcp-support">MCP Support</a></li>
+            </ul>
+        </aside>
+
+        <main class="docs-content">
+            <h1 id="introduction">Introduction</h1>
+            <p>GoSkills is a Go package designed to parse and run Claude Skill packages. It adheres to the
+                specifications found in the official Claude documentation, allowing you to build intelligent agents that
+                can utilize a wide range of skills.</p>
+
+            <h2 id="installation">Installation</h2>
+            <p>To use GoSkills in your project, you can install it via <code>go get</code>:</p>
+            <pre><code>go get github.com/smallnest/goskills</code></pre>
+
+            <p>You can also install the CLI tools using Homebrew:</p>
+            <pre><code>brew tap smallnest/goskills
+brew install goskills</code></pre>
+
+            <h2 id="goskills-runner">GoSkills Runner</h2>
+            <p>The GoSkills Runner (<code>goskills</code>) is the primary tool for executing Claude skills with LLM integration. It simulates the Claude skill-use workflow by discovering available skills, selecting the most appropriate one, and executing it.</p>
+
+            <h3>Basic Usage</h3>
+            <p>Set your OpenAI API key and run the runner:</p>
+            <pre><code>export OPENAI_API_KEY="YOUR_KEY"
+./goskills run "create an algorithm that generates abstract art"</code></pre>
+
+            <h3>Features</h3>
+            <ul>
+                <li><strong>Skill Discovery</strong>: Automatically finds available skills in the specified directory</li>
+                <li><strong>Intelligent Selection</strong>: Uses LLM to select the most appropriate skill for your request</li>
+                <li><strong>Tool Integration</strong>: Built-in tools for shell commands, Python execution, file operations, and more</li>
+                <li><strong>MCP Support</strong>: Integration with Model Context Protocol servers</li>
+                <li><strong>Interactive Mode</strong>: Option for human-in-the-loop skill execution</li>
+            </ul>
+
+            <h3>Configuration Options</h3>
+            <pre><code># Use custom model and API base
+export OPENAI_API_KEY="YOUR_KEY"
+export OPENAI_API_BASE="https://api.deepseek.com/v1"
+export OPENAI_MODEL="deepseek-v3"
+./goskills run "your prompt here"</code></pre>
+
+            <h3>Command-Line Options</h3>
+            <pre><code># Available options
+--skills-dir DIR     # Specify skills directory (default: ./skills)
+--model MODEL         # Custom model name
+--api-base URL       # Custom API base URL
+--auto-approve        # Skip human approval for tool execution
+--verbose             # Enable verbose output
+--loop                # Run in continuous loop mode</code></pre>
+
+            <h3>Example Usage</h3>
+            <pre><code># Basic skill execution
+./goskills run "create a React component for a todo app"
+
+# With custom model
+./goskills run --model deepseek-v3 --api-base https://api.deepseek.com/v1 "your prompt"
+
+# Auto-approve tool execution
+./goskills run --auto-approve "use markitdown to parse https://example.com"
+
+# Loop mode for continuous interaction
+./goskills run --loop "interactive mode"</code></pre>
+
+            <h2 id="goskills-download">Download Command</h2>
+            <p>The GoSkills Download command allows you to easily download skill packages directly from GitHub repositories to your local <code>~/.goskills/skills</code> directory.</p>
+
+            <h3>Basic Usage</h3>
+            <p>Download a skill from a GitHub directory URL:</p>
+            <pre><code>./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer</code></pre>
+
+            <h3>Features</h3>
+            <ul>
+                <li><strong>Direct GitHub Downloads</strong>: Download skills directly from GitHub repository URLs</li>
+                <li><strong>Recursive Downloads</strong>: Automatically downloads all files and subdirectories</li>
+                <li><strong>Smart Directory Creation</strong>: Creates <code>~/.goskills/skills</code> if it doesn't exist</li>
+                <li><strong>Automatic Naming</strong>: Extracts skill name from URL and creates appropriate local directory</li>
+                <li><strong>Duplicate Prevention</strong>: Prevents downloading skills that already exist</li>
+            </ul>
+
+            <h3>URL Format</h3>
+            <p>The download command expects GitHub URLs in the following format:</p>
+            <pre><code>https://github.com/{owner}/{repo}/tree/{branch}/{path}</code></pre>
+
+            <h3>Examples</h3>
+            <pre><code># Download a simple skill package
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer
+
+# Download a complex skill with subdirectories
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/artifacts-builder
+
+# Download from different repositories
+./goskills download https://github.com/user/repo/tree/main/my-custom-skill</code></pre>
+
+            <h3>What Gets Downloaded</h3>
+            <p>When you download a skill, the command will:</p>
+            <ul>
+                <li>Create the <code>~/.goskills/skills</code> directory if it doesn't exist</li>
+                <li>Extract the skill name from the URL path (e.g., <code>meeting-insights-analyzer</code>)</li>
+                <li>Download all files and subdirectories recursively</li>
+                <li>Create a local directory with the same name as the skill</li>
+                <li>Show progress messages during download</li>
+                <li>Prevent duplicate downloads with clear error messages</li>
+            </ul>
+
+            <h2 id="goskills-cli">GoSkills CLI</h2>
+            <p>The GoSkills CLI (<code>goskills-cli</code>) is used for inspecting and managing your local Claude skills.</p>
+
+            <h3>Available Commands</h3>
+            <ul>
+                <li><strong>list</strong>: List all available skills in a directory</li>
+                <li><strong>parse</strong>: Parse and display information about a specific skill</li>
+                <li><strong>detail</strong>: Show complete details of a skill including content</li>
+                <li><strong>files</strong>: List all files that make up a skill package</li>
+                <li><strong>search</strong>: Search skills by name or description</li>
+            </ul>
+
+            <h3>Examples</h3>
+            <pre><code># List all skills in a directory
+./goskills-cli list ./skills
+
+# Parse a specific skill
+./goskills-cli parse ./skills/my-skill
+
+# Search for skills
+./goskills-cli search ./skills "web app"
+
+# Show skill details
+./goskills-cli detail ./skills/data-analysis
+
+# List files in skill package
+./goskills-cli files ./skills/my-skill</code></pre>
+
+            <h2 id="library-usage">Library Usage</h2>
+            <p>For programmatic integration, GoSkills provides a Go library that you can import into your projects:</p>
+            <pre><code>package main
+
+import (
+    "fmt"
+    "log"
+    "github.com/smallnest/goskills"
+)
+
+func main() {
+    // Parse a single skill package
+    skillDirectory := "./skills/my-skill"
+    skillPackage, err := goskills.ParseSkillPackage(skillDirectory)
+    if err != nil {
+        log.Fatalf("Failed to parse skill package: %v", err)
+    }
+    fmt.Printf("Skill: %s\n", skillPackage.Meta.Name)
+    fmt.Printf("Description: %s\n", skillPackage.Meta.Description)
+
+    // Parse multiple skills in a directory
+    packages, err := goskills.ParseSkillPackages("./skills")
+    if err != nil {
+        log.Fatalf("Failed to parse skill packages: %v", err)
+    }
+    fmt.Printf("Found %d skills\n", len(packages))
+}</code></pre>
+
+            <h3>Key Functions</h3>
+            <ul>
+                <li><code>ParseSkillPackage(path string) (*SkillPackage, error)</code> - Parse a single skill</li>
+                <li><code>ParseSkillPackages(rootDir string) ([]*SkillPackage, error)</code> - Parse all skills in directory</li>
+            </ul>
+
+            <h3 id="custom-models">Advanced Configuration</h3>
+            <p>You can use other models like DeepSeek, Qianfan, or any OpenAI-compatible API by specifying the configuration:</p>
+            <pre><code>export OPENAI_API_KEY="YOUR_KEY"
+export OPENAI_API_BASE="https://api.deepseek.com/v1"
+export OPENAI_MODEL="deepseek-v3"
+export TAVILY_API_KEY="YOUR_TAVILY_KEY"  # For search features
+
+# Run with custom configuration
+./goskills run --auto-approve "your advanced prompt here"</code></pre>
+
+            <h2 id="mcp-support">MCP Support</h2>
+            <p>GoSkills has built-in support for the Model Context Protocol (MCP), allowing you to connect to external tools and data sources. MCP servers extend the capabilities of GoSkills by providing additional tools beyond the built-in set.</p>
+
+            <h3>Configuration</h3>
+            <p>Create a <code>mcp.json</code> configuration file to define your MCP servers:</p>
+            <pre><code>{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/directory"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "path/to/database.db"]
+    }
+  }
+}</code></pre>
+
+            <h3>Environment Variables</h3>
+            <ul>
+                <li><code>MCP_CONFIG</code>: Path to your MCP configuration file (default: <code>mcp.json</code>)</li>
+                <li><code>OPENAI_API_KEY</code>: Your LLM API key (required)</li>
+                <li><code>OPENAI_API_BASE</code>: Custom API base URL (optional)</li>
+                <li><code>TAVILY_API_KEY</code>: Tavily search API key for enhanced search capabilities (optional)</li>
+            </ul>
+
+            <h3>Built-in Tools</h3>
+            <p>GoSkills includes a comprehensive set of built-in tools that work with MCP:</p>
+            <ul>
+                <li><strong>Shell Tools</strong>: Execute shell commands and scripts</li>
+                <li><strong>Python Tools</strong>: Run Python code and scripts</li>
+                <li><strong>File Tools</strong>: Read, write, and manage files</li>
+                <li><strong>Web Tools</strong>: Fetch and process web content</li>
+                <li><strong>Search Tools</strong>: Wikipedia and Tavily search integration</li>
+                <li><strong>MCP Tools</strong>: Access to external MCP-configured tools</li>
+            </ul>
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 GoSkills. Released under the MIT License.</p>
+    </footer>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

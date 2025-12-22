@@ -5,6 +5,14 @@
 ## [Unreleased]
 
 ### 新增特性
+- **下载命令 (Download Command)**: 添加 `goskills download` 命令，支持从 GitHub 下载技能包到 `~/.goskills/skills` 目录。
+  - 支持递归下载所有文件和子目录
+  - 自动创建目标目录
+  - 智能错误处理（重复下载、无效 URL 等）
+  - 支持从 GitHub 目录 URL 直接下载技能包
+  - 自动提取技能名称并创建对应的本地目录
+- **CLI 工具更新**: 更新 `goskills` 命令行工具，新增 download 子命令
+- **文档更新**: 更新 README.md 和 README_CN.md 文档，添加 download 命令使用说明
 - **递归深度 (Recursive Depth)**: 实现动态规划能力，允许 Agent 在信息不足时自动请求新的搜索和分析任务，形成闭环的 Deep Research 流程。
 
 ## [v0.3.5] - 2025-11-30

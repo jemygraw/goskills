@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/smallnest/goskills"
@@ -40,6 +44,8 @@ func Execute() {
 func main() {
 	rootCmd.AddCommand(runCmd)
 	setupFlags(runCmd)
+
+	rootCmd.AddCommand(downloadCmd)
 
 	Execute()
 }
@@ -140,3 +146,177 @@ You can specify a custom model and API base URL using flags.`,
 		return nil
 	},
 }
+
+var downloadCmd = &cobra.Command{
+	Use:   "download <github_url>",
+	Short: "Downloads a skill from GitHub to ~/.goskills/skills",
+	Long: `Downloads a skill package from a GitHub directory URL.
+Example: goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		githubURL := args[0]
+
+		// Parse GitHub URL to get owner, repo, branch, and path
+		owner, repo, branch, dirPath, err := parseGitHubURL(githubURL)
+		if err != nil {
+			return fmt.Errorf("failed to parse GitHub URL: %w", err)
+		}
+
+		// Get home directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+
+		// Create ~/.goskills/skills directory if it doesn't exist
+		skillsDir := filepath.Join(homeDir, ".goskills", "skills")
+		if err := os.MkdirAll(skillsDir, 0755); err != nil {
+			return fmt.Errorf("failed to create skills directory: %w", err)
+		}
+
+		// Extract skill name from directory path
+		skillName := filepath.Base(dirPath)
+		targetDir := filepath.Join(skillsDir, skillName)
+
+		// Check if skill already exists
+		if _, err := os.Stat(targetDir); err == nil {
+			return fmt.Errorf("skill '%s' already exists in %s", skillName, targetDir)
+		}
+
+		log.Info("Downloading skill '%s' from GitHub...", skillName)
+
+		// Download files from GitHub
+		if err := downloadGitHubDirectory(owner, repo, branch, dirPath, targetDir); err != nil {
+			return fmt.Errorf("failed to download skill: %w", err)
+		}
+
+		log.Info("Successfully downloaded skill to: %s", targetDir)
+		return nil
+	},
+}
+
+// parseGitHubURL parses a GitHub URL and extracts owner, repo, branch, and directory path
+func parseGitHubURL(url string) (owner, repo, branch, path string, err error) {
+	// Expected format: https://github.com/{owner}/{repo}/tree/{branch}/{path}
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "github.com/")
+
+	parts := strings.Split(url, "/")
+	if len(parts) < 5 || parts[2] != "tree" {
+		return "", "", "", "", fmt.Errorf("invalid GitHub URL format. Expected: https://github.com/owner/repo/tree/branch/path")
+	}
+
+	owner = parts[0]
+	repo = parts[1]
+	branch = parts[3]
+	path = strings.Join(parts[4:], "/")
+
+	return owner, repo, branch, path, nil
+}
+
+// GitHubContent represents a file or directory from GitHub API
+type GitHubContent struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Type        string `json:"type"`
+	DownloadURL string `json:"download_url"`
+	URL         string `json:"url"`
+}
+
+// downloadGitHubDirectory downloads all files from a GitHub directory recursively
+func downloadGitHubDirectory(owner, repo, branch, dirPath, targetDir string) error {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s?ref=%s", owner, repo, dirPath, branch)
+
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch directory contents: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitHub API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var contents []GitHubContent
+	if err := json.NewDecoder(resp.Body).Decode(&contents); err != nil {
+		return fmt.Errorf("failed to decode GitHub API response: %w", err)
+	}
+
+	// Create target directory
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
+	}
+
+	for _, item := range contents {
+		itemPath := filepath.Join(targetDir, item.Name)
+
+		if item.Type == "file" {
+			log.Info("Downloading file: %s", item.Name)
+			if err := downloadFile(item.DownloadURL, itemPath); err != nil {
+				return fmt.Errorf("failed to download file %s: %w", item.Name, err)
+			}
+		} else if item.Type == "dir" {
+			log.Info("Downloading directory: %s", item.Name)
+			// Recursively download subdirectory
+			if err := downloadGitHubDirectory(owner, repo, branch, item.Path, itemPath); err != nil {
+				return fmt.Errorf("failed to download directory %s: %w", item.Name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// downloadFile downloads a file from a URL and saves it to the specified path
+func downloadFile(url, filepath string) error {
+	// Handle data URLs (base64 encoded content)
+	if strings.HasPrefix(url, "data:") {
+		return downloadDataURL(url, filepath)
+	}
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download returned status %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// downloadDataURL handles data URLs with base64 encoded content
+func downloadDataURL(dataURL, filepath string) error {
+	// Parse data URL format: data:[<mediatype>][;base64],<data>
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid data URL format")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return fmt.Errorf("failed to decode base64 data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+

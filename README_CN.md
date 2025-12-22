@@ -119,6 +119,23 @@ go build -o goskills ./cmd/goskills
 
 #### 可用命令
 
+#### download
+从 GitHub 目录 URL 下载技能包到 `~/.goskills/skills`。
+
+```shell
+# 从 GitHub 下载技能
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer
+
+# 下载包含子目录的技能
+./goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/artifacts-builder
+```
+
+download 命令功能：
+- 如果 `~/.goskills/skills` 目录不存在，自动创建
+- 递归下载所有文件和子目录
+- 从 URL 中提取技能名称并将其用作目标目录名
+- 通过错误消息防止重复下载
+
 #### run
 处理用户请求，首先发现可用技能，然后要求 LLM 选择最合适的技能，最后通过将所选技能的内容作为系统提示提供给 LLM 来执行该技能。
 
