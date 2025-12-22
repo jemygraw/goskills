@@ -129,7 +129,7 @@ make</code></pre>
             <div class="container">
                 <div class="section-title">
                     <h2>Usage</h2>
-                    <p>Two powerful tools for different needs.</p>
+                    <p>Three powerful tools for different needs.</p>
                 </div>
 
                 <div class="usage-block">
@@ -152,7 +152,21 @@ make</code></pre>
 
                 <div class="usage-block">
                     <div class="usage-header">
-                        <h3>2. The Manager (`goskills-cli`)</h3>
+                        <h3>2. The Downloader (`goskills download`)</h3>
+                        <p>Download skills directly from GitHub repositories to your local skills directory.</p>
+                    </div>
+                    <div class="code-preview">
+<pre><code><span class="comment"># Download a skill from GitHub</span>
+<span class="command">goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer</span>
+
+<span class="comment"># Skills are downloaded to ~/.goskills/skills</span>
+<span class="command">ls ~/.goskills/skills</span></code></pre>
+                    </div>
+                </div>
+
+                <div class="usage-block">
+                    <div class="usage-header">
+                        <h3>3. The Manager (`goskills-cli`)</h3>
                         <p>Inspect, parse, and validate your local skill definitions.</p>
                     </div>
                     <div class="code-preview">
