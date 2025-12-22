@@ -49,6 +49,8 @@
 
 <span class="comment"># 使用你喜欢的 LLM 运行技能</span>
 <span class="command">export OPENAI_API_KEY=sk-...</span>
+<span class="command">export OPENAI_MODEL="deepseek-chat"</span>
+<span class="command">export OPENAI_API_BASE="https://api.deepseek.com/v1"</span>
 <span class="command">goskills run "创建一个 todo 应用的 React 组件"</span></code></pre>
             </div>
         </section>
@@ -141,6 +143,8 @@ make</code></pre>
 <pre><code><span class="comment"># 1. 设置环境变量</span>
 <span class="command">export OPENAI_API_KEY="sk-..."</span>
 <span class="command">export OPENAI_MODEL="gpt-4o"</span> <span class="comment"># 可选，默认为 gpt-4o</span>
+<span class="command">export OPENAI_API_BASE="https://api.openai.com/v1"</span> <span class="comment"># 可选，默认为 OPENAI API URL</span>
+
 
 <span class="comment"># 2. 执行任务（例如：生成艺术作品）</span>
 <span class="command">goskills run "创建一个生成抽象艺术的算法"</span>

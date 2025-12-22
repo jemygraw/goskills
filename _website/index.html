@@ -49,6 +49,8 @@
 
 <span class="comment"># Run a skill with your favorite LLM</span>
 <span class="command">export OPENAI_API_KEY=sk-...</span>
+<span class="command">export OPENAI_MODEL="deepseek-chat"</span>
+<span class="command">export OPENAI_API_BASE="https://api.deepseek.com/v1"</span>
 <span class="command">goskills run "create a react component for a todo app"</span></code></pre>
             </div>
         </section>
@@ -141,6 +143,9 @@ make</code></pre>
 <pre><code><span class="comment"># 1. Set up your environment</span>
 <span class="command">export OPENAI_API_KEY="sk-..."</span>
 <span class="command">export OPENAI_MODEL="gpt-4o"</span> <span class="comment"># Optional, defaults to gpt-4o</span>
+<span class="command">export OPENAI_API_BASE="https://api.openai.com/v1"</span> <span class="comment"># Optional, defaults to OPENAI api url</span>
+
+
 
 <span class="comment"># 2. Run a task (e.g., generate art)</span>
 <span class="command">goskills run "create an algorithm that generates abstract art"</span>

@@ -52,6 +52,11 @@ brew install goskills
 # 设置你的 OpenAI API 密钥
 export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
+# 可选：使用 DeepSeek API（推荐以获得更好的性能）
+export OPENAI_API_KEY="sk-..."
+export OPENAI_MODEL="deepseek-chat"
+export OPENAI_API_BASE="https://api.deepseek.com/v1"
+
 # 启动 Web 界面
 ./agent-web
 
