@@ -80,9 +80,19 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 	}
 	cfg.APIBase = strings.TrimRight(cfg.APIBase, "/")
 
-	// Resolve SkillsDir to absolute path
+	// Resolve SkillsDir to absolute path and expand ~
 	if cfg.SkillsDir == "" {
-		cfg.SkillsDir = "~/.claude/skills" // Default
+		// Prefer local testdata when present (useful for tests); otherwise use user default
+		if _, err := os.Stat("~/.goskills/skills"); err == nil {
+			cfg.SkillsDir = "~/.goskills/skills"
+		}
+	}
+	if strings.HasPrefix(cfg.SkillsDir, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		cfg.SkillsDir = filepath.Join(home, cfg.SkillsDir[1:])
 	}
 	absSkillsDir, err := filepath.Abs(cfg.SkillsDir)
 	if err != nil {
@@ -95,7 +105,8 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 
 // SetupFlags registers the flags with the command
 func setupFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("skills-dir", "d", "./testdata/skills", "Path to the skills directory")
+	// Default to empty string; loadConfig will set the actual default (~/.goskills/skills or testdata/skills for development)
+	cmd.Flags().StringP("skills-dir", "d", "~/.goskills/skills", "Path to the skills directory (default: ~/.goskills/skills)")
 	cmd.Flags().StringP("model", "m", "", "OpenAI-compatible model name (falls back to OPENAI_MODEL env var)")
 	cmd.Flags().StringP("api-base", "b", "", "OpenAI-compatible API base URL (falls back to OPENAI_API_BASE env var)")
 	cmd.Flags().StringP("api-key", "k", "", "OpenAI-compatible API key (falls back to OPENAI_API_KEY env var)")

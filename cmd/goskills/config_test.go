@@ -26,7 +26,7 @@ func TestLoadConfig(t *testing.T) {
 	assert.NotNil(t, cfg)
 
 	// Check default values (note: SkillsDir will be resolved to absolute path)
-	assert.Contains(t, cfg.SkillsDir, "testdata/skills")
+	assert.Contains(t, cfg.SkillsDir, ".goskills/skills")
 	assert.True(t, cfg.AutoApproveTools)
 	assert.False(t, cfg.Verbose)
 	assert.False(t, cfg.Loop)
@@ -151,7 +151,7 @@ func TestLoadConfig_DefaultSkillsDir(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Should use default (but resolved to absolute path)
-	assert.Contains(t, cfg.SkillsDir, "testdata/skills")
+	assert.Contains(t, cfg.SkillsDir, ".goskills/skills")
 }
 
 func TestLoadConfig_AllowedScripts(t *testing.T) {

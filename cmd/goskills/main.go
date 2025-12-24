@@ -18,7 +18,7 @@ import (
 )
 
 // Version is the version of the tool, set at build time
-var Version = "v0.4.3"
+var Version = "v0.5.1"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -147,6 +147,8 @@ You can specify a custom model and API base URL using flags.`,
 	},
 }
 
+var forceDownload bool
+
 var downloadCmd = &cobra.Command{
 	Use:   "download <github_url>",
 	Short: "Downloads a skill from GitHub to ~/.goskills/skills",
@@ -180,7 +182,14 @@ Example: goskills download https://github.com/ComposioHQ/awesome-claude-skills/t
 
 		// Check if skill already exists
 		if _, err := os.Stat(targetDir); err == nil {
-			return fmt.Errorf("skill '%s' already exists in %s", skillName, targetDir)
+			if forceDownload {
+				log.Info("Skill '%s' already exists, removing due to -f flag...", skillName)
+				if err := os.RemoveAll(targetDir); err != nil {
+					return fmt.Errorf("failed to remove existing directory: %w", err)
+				}
+			} else {
+				return fmt.Errorf("skill '%s' already exists in %s (use -f to force overwrite)", skillName, targetDir)
+			}
 		}
 
 		log.Info("Downloading skill '%s' from GitHub...", skillName)
@@ -193,6 +202,10 @@ Example: goskills download https://github.com/ComposioHQ/awesome-claude-skills/t
 		log.Info("Successfully downloaded skill to: %s", targetDir)
 		return nil
 	},
+}
+
+func init() {
+	downloadCmd.Flags().BoolVarP(&forceDownload, "force", "f", false, "Force remove existing directory before downloading")
 }
 
 // parseGitHubURL parses a GitHub URL and extracts owner, repo, branch, and directory path
@@ -319,4 +332,3 @@ func downloadDataURL(dataURL, filepath string) error {
 
 	return nil
 }
-
