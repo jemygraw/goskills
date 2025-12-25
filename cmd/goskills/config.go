@@ -17,6 +17,7 @@ type Config struct {
 	AutoApproveTools bool
 	AllowedScripts   []string
 	Verbose          bool
+	Debug            bool
 	Loop             bool
 	McpConfig        string
 }
@@ -48,6 +49,10 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Verbose, err = cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return nil, err
+	}
+	cfg.Debug, err = cmd.Flags().GetBool("debug")
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +118,7 @@ func setupFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("auto-approve", true, "Auto-approve all tool calls (WARNING: potentially unsafe)")
 	cmd.Flags().StringSlice("allow-scripts", nil, "Comma-separated list of allowed script names (e.g. 'run_myscript_py')")
 	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
+	cmd.Flags().BoolP("debug", "D", false, "Enable debug output (print LLM requests/responses)")
 	cmd.Flags().BoolP("loop", "l", false, "Enable interactive loop mode")
 	cmd.Flags().String("mcp-config", "", "Path to MCP configuration file")
 }

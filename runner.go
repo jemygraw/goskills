@@ -36,6 +36,7 @@ type RunnerConfig struct {
 	Model            string
 	SkillsDir        string
 	Verbose          bool
+	Debug            bool
 	AutoApproveTools bool
 	AllowedScripts   []string
 	Loop             bool
@@ -200,10 +201,12 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 		Temperature: 0,
 	}
 
+	a.debugPrintRequest(req)
 	resp, err := a.client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return "", err
 	}
+	a.debugPrintResponse(resp)
 
 	content := strings.TrimSpace(resp.Choices[0].Message.Content)
 	content = strings.Trim(content, "'\"")
@@ -238,12 +241,62 @@ func extractSkillName(content string, skills map[string]SkillPackage) string {
 	return content
 }
 
+// debugPrintRequest prints the LLM request in debug mode
+func (a *Agent) debugPrintRequest(req openai.ChatCompletionRequest) {
+	if !a.cfg.Debug {
+		return
+	}
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+	fmt.Fprintln(os.Stderr, "LLM Request:")
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+	fmt.Fprintf(os.Stderr, "Model: %s\n", req.Model)
+	fmt.Fprintf(os.Stderr, "Temperature: %v\n", req.Temperature)
+	fmt.Fprintln(os.Stderr, "Messages:")
+	for i, msg := range req.Messages {
+		fmt.Fprintf(os.Stderr, "  [%d] %s:\n", i, msg.Role)
+		// Truncate long messages for readability
+		content := msg.Content
+		if len(content) > 500 {
+			content = content[:500] + "... (truncated)"
+		}
+		fmt.Fprintf(os.Stderr, "      %s\n", content)
+	}
+	if len(req.Tools) > 0 {
+		fmt.Fprintf(os.Stderr, "Tools: %d\n", len(req.Tools))
+	}
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+}
+
+// debugPrintResponse prints the LLM response in debug mode
+func (a *Agent) debugPrintResponse(resp openai.ChatCompletionResponse) {
+	if !a.cfg.Debug {
+		return
+	}
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+	fmt.Fprintln(os.Stderr, "LLM Response:")
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+	if len(resp.Choices) > 0 {
+		msg := resp.Choices[0].Message
+		fmt.Fprintf(os.Stderr, "Role: %s\n", msg.Role)
+		fmt.Fprintf(os.Stderr, "Content: %s\n", msg.Content)
+		if len(msg.ToolCalls) > 0 {
+			fmt.Fprintf(os.Stderr, "ToolCalls: %d\n", len(msg.ToolCalls))
+			for _, tc := range msg.ToolCalls {
+				fmt.Fprintf(os.Stderr, "  - %s: %s\n", tc.Function.Name, tc.Function.Arguments)
+			}
+		}
+	}
+	fmt.Fprintf(os.Stderr, "Usage: PromptTokens=%d, CompletionTokens=%d, TotalTokens=%d\n",
+		resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
+	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+}
+
 // executeSkillWithTools sets up the initial system prompt and starts the tool-use conversation.
 func (a *Agent) executeSkillWithTools(ctx context.Context, userPrompt string, skill *SkillPackage) (string, error) {
 	// Prepare the system message once
 	var skillBody strings.Builder
 	skillBody.WriteString(skill.Body)
-	skillBody.WriteString("\n\n## SKILL CONTEXT\n")
+	skillBody.WriteString("\n\n##如果SKILL中没有要调用脚本的必要，则不要调用Tool,尤其是run_shell_script工具，直接根据SKILL的描述直接生成答案。\n\n ## SKILL CONTEXT\n")
 	skillBody.WriteString(fmt.Sprintf("Skill Root Path: %s\n", skill.Path))
 	a.messages = append(a.messages, openai.ChatCompletionMessage{
 		Role:    openai.ChatMessageRoleSystem,
@@ -283,10 +336,12 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 			Tools:    availableTools,
 		}
 
+		a.debugPrintRequest(req)
 		resp, err := a.client.CreateChatCompletion(ctx, req)
 		if err != nil {
 			return "", fmt.Errorf("ChatCompletion error: %w", err)
 		}
+		a.debugPrintResponse(resp)
 
 		msg := resp.Choices[0].Message
 		a.messages = append(a.messages, msg) // Append LLM's response

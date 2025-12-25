@@ -18,7 +18,7 @@ import (
 )
 
 // Version is the version of the tool, set at build time
-var Version = "v0.5.1"
+var Version = "v0.5.3"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -87,6 +87,7 @@ You can specify a custom model and API base URL using flags.`,
 			Model:            cfg.Model,
 			SkillsDir:        cfg.SkillsDir,
 			Verbose:          cfg.Verbose,
+			Debug:            cfg.Debug,
 			AutoApproveTools: cfg.AutoApproveTools,
 			AllowedScripts:   cfg.AllowedScripts,
 			Loop:             cfg.Loop,
