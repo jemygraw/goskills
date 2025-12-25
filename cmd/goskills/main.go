@@ -152,8 +152,10 @@ var forceDownload bool
 var downloadCmd = &cobra.Command{
 	Use:   "download <github_url>",
 	Short: "Downloads a skill from GitHub to ~/.goskills/skills",
-	Long: `Downloads a skill package from a GitHub directory URL.
-Example: goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer`,
+	Long: `Downloads a skill package from a GitHub URL.
+Examples:
+  goskills download https://github.com/owner/repo
+  goskills download https://github.com/ComposioHQ/awesome-claude-skills/tree/master/meeting-insights-analyzer`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		githubURL := args[0]
@@ -178,6 +180,9 @@ Example: goskills download https://github.com/ComposioHQ/awesome-claude-skills/t
 
 		// Extract skill name from directory path
 		skillName := filepath.Base(dirPath)
+		if skillName == "." || skillName == "" {
+			skillName = repo
+		}
 		targetDir := filepath.Join(skillsDir, skillName)
 
 		// Check if skill already exists
@@ -209,15 +214,28 @@ func init() {
 }
 
 // parseGitHubURL parses a GitHub URL and extracts owner, repo, branch, and directory path
+// Supports formats:
+// - https://github.com/{owner}/{repo} (defaults to master branch, root path)
+// - https://github.com/{owner}/{repo}/tree/{branch}/{path}
 func parseGitHubURL(url string) (owner, repo, branch, path string, err error) {
-	// Expected format: https://github.com/{owner}/{repo}/tree/{branch}/{path}
 	url = strings.TrimPrefix(url, "https://")
 	url = strings.TrimPrefix(url, "http://")
 	url = strings.TrimPrefix(url, "github.com/")
 
 	parts := strings.Split(url, "/")
+
+	// Handle simple repo URL: owner/repo
+	if len(parts) == 2 {
+		owner = parts[0]
+		repo = parts[1]
+		branch = "master"
+		path = ""
+		return owner, repo, branch, path, nil
+	}
+
+	// Handle full URL with tree: owner/repo/tree/branch/path
 	if len(parts) < 5 || parts[2] != "tree" {
-		return "", "", "", "", fmt.Errorf("invalid GitHub URL format. Expected: https://github.com/owner/repo/tree/branch/path")
+		return "", "", "", "", fmt.Errorf("invalid GitHub URL format. Expected: https://github.com/owner/repo or https://github.com/owner/repo/tree/branch/path")
 	}
 
 	owner = parts[0]
