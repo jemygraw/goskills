@@ -36,7 +36,7 @@ func TavilySearchWithLimitAndURL(query string, maxResults int, apiURL string) (s
 		maxResults = 100
 	}
 
-	requestBody, err := json.Marshal(map[string]interface{}{
+	requestBody, err := json.Marshal(map[string]any{
 		"query":          query,
 		"search_depth":   "basic",
 		"max_results":    maxResults,

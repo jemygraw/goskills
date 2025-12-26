@@ -18,7 +18,7 @@ import (
 )
 
 // Version is the version of the tool, set at build time
-var Version = "v0.5.3"
+var Version = "v0.5.4"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -91,6 +91,7 @@ You can specify a custom model and API base URL using flags.`,
 			AutoApproveTools: cfg.AutoApproveTools,
 			AllowedScripts:   cfg.AllowedScripts,
 			Loop:             cfg.Loop,
+			SkillName:        cfg.SkillName,
 		}
 
 		ctx := context.Background()
@@ -110,7 +111,7 @@ You can specify a custom model and API base URL using flags.`,
 		}
 
 		if mcpConfigPath != "" {
-			if cfg.Verbose {
+			if cfg.Verbose >= 1 {
 				log.Info("loading mcp config from: %s", mcpConfigPath)
 			}
 			mcpConfig, err := goskills_mcp.LoadConfig(mcpConfigPath)
@@ -122,7 +123,7 @@ You can specify a custom model and API base URL using flags.`,
 					log.Warn("failed to create mcp client: %v", err)
 				} else {
 					defer mcpClient.Close()
-					if cfg.Verbose {
+					if cfg.Verbose >= 1 {
 						log.Info("mcp client initialized")
 					}
 				}

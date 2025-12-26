@@ -185,8 +185,7 @@ func BenchmarkShellTool_Run(b *testing.B) {
 	args := map[string]any{}
 	code := "echo 'Benchmark test'"
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := shellTool.Run(args, code)
 		if err != nil {
 			b.Fatalf("ShellTool.Run() error = %v", err)

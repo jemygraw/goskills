@@ -145,7 +145,7 @@ func (c *Client) GetTools(ctx context.Context) ([]openai.Tool, error) {
 
 // CallTool calls a tool on the appropriate server with retry and reconnection support.
 // The tool name is expected to be in the format "serverName__toolName".
-func (c *Client) CallTool(ctx context.Context, name string, args map[string]interface{}) (interface{}, error) {
+func (c *Client) CallTool(ctx context.Context, name string, args map[string]any) (any, error) {
 	serverName, toolName, err := parseToolName(name)
 	if err != nil {
 		return nil, err

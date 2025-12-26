@@ -43,7 +43,7 @@ func TestGetBaseTools(t *testing.T) {
 			continue
 		}
 
-		params, ok := tool.Function.Parameters.(map[string]interface{})
+		params, ok := tool.Function.Parameters.(map[string]any)
 		if !ok {
 			t.Errorf("Tool %d parameters are not a map[string]interface{}", i)
 			continue
@@ -54,7 +54,7 @@ func TestGetBaseTools(t *testing.T) {
 			t.Errorf("Tool %d parameters type is not 'object'", i)
 		}
 
-		properties, ok := params["properties"].(map[string]interface{})
+		properties, ok := params["properties"].(map[string]any)
 		if !ok {
 			t.Errorf("Tool %d parameters properties are not a map[string]interface{}", i)
 			continue
@@ -174,13 +174,13 @@ func TestToolDefinitionsStructure(t *testing.T) {
 			}
 
 			// Check parameters
-			params, ok := foundTool.Parameters.(map[string]interface{})
+			params, ok := foundTool.Parameters.(map[string]any)
 			if !ok {
 				t.Errorf("Tool %s parameters are not in expected format", tc.name)
 				return
 			}
 
-			properties, ok := params["properties"].(map[string]interface{})
+			properties, ok := params["properties"].(map[string]any)
 			if !ok {
 				t.Errorf("Tool %s properties are not in expected format", tc.name)
 				return
@@ -198,7 +198,7 @@ func TestToolDefinitionsStructure(t *testing.T) {
 				requiredSlice, ok := required.([]string)
 				if !ok {
 					// Try to convert from []interface{} to []string
-					if ifaceSlice, ok := required.([]interface{}); ok {
+					if ifaceSlice, ok := required.([]any); ok {
 						requiredSlice = make([]string, len(ifaceSlice))
 						for i, r := range ifaceSlice {
 							if s, ok := r.(string); ok {
@@ -276,13 +276,13 @@ func TestToolParameterTypes(t *testing.T) {
 				return
 			}
 
-			params, ok := foundTool.Parameters.(map[string]interface{})
+			params, ok := foundTool.Parameters.(map[string]any)
 			if !ok {
 				t.Errorf("Tool %s parameters are not in expected format", tc.toolName)
 				return
 			}
 
-			properties, ok := params["properties"].(map[string]interface{})
+			properties, ok := params["properties"].(map[string]any)
 			if !ok {
 				t.Errorf("Tool %s properties are not in expected format", tc.toolName)
 				return
@@ -294,7 +294,7 @@ func TestToolParameterTypes(t *testing.T) {
 				return
 			}
 
-			paramMap, ok := param.(map[string]interface{})
+			paramMap, ok := param.(map[string]any)
 			if !ok {
 				t.Errorf("Tool %s parameter %s is not in expected format", tc.toolName, tc.paramName)
 				return
@@ -360,7 +360,7 @@ func TestToolsJSONSerialization(t *testing.T) {
 }
 
 func BenchmarkGetBaseTools(b *testing.B) {
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = GetBaseTools()
 	}
 }

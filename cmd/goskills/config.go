@@ -16,9 +16,10 @@ type Config struct {
 	APIKey           string
 	AutoApproveTools bool
 	AllowedScripts   []string
-	Verbose          bool
+	Verbose          int
 	Debug            bool
 	Loop             bool
+	SkillName        string
 	McpConfig        string
 }
 
@@ -48,7 +49,7 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Verbose, err = cmd.Flags().GetBool("verbose")
+	cfg.Verbose, err = cmd.Flags().GetCount("verbose")
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +58,10 @@ func loadConfig(cmd *cobra.Command) (*Config, error) {
 		return nil, err
 	}
 	cfg.Loop, err = cmd.Flags().GetBool("loop")
+	if err != nil {
+		return nil, err
+	}
+	cfg.SkillName, err = cmd.Flags().GetString("skill")
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +122,9 @@ func setupFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("api-key", "k", "", "OpenAI-compatible API key (falls back to OPENAI_API_KEY env var)")
 	cmd.Flags().Bool("auto-approve", true, "Auto-approve all tool calls (WARNING: potentially unsafe)")
 	cmd.Flags().StringSlice("allow-scripts", nil, "Comma-separated list of allowed script names (e.g. 'run_myscript_py')")
-	cmd.Flags().BoolP("verbose", "v", false, "Enable verbose output")
+	cmd.Flags().CountP("verbose", "v", "Enable verbose output (-v for basic, -vv for detailed)")
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug output (print LLM requests/responses)")
 	cmd.Flags().BoolP("loop", "l", false, "Enable interactive loop mode")
+	cmd.Flags().String("skill", "", "Force specific skill to use (skip LLM selection)")
 	cmd.Flags().String("mcp-config", "", "Path to MCP configuration file")
 }

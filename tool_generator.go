@@ -67,13 +67,13 @@ func generateScriptTool(skillPath, scriptRelPath string) (openai.Tool, string) {
 		Function: &openai.FunctionDefinition{
 			Name:        toolName,
 			Description: description,
-			Parameters: map[string]interface{}{
+			Parameters: map[string]any{
 				"type": "object",
-				"properties": map[string]interface{}{
-					"args": map[string]interface{}{
+				"properties": map[string]any{
+					"args": map[string]any{
 						"type":        "array",
 						"description": "Arguments to pass to the script.",
-						"items": map[string]interface{}{
+						"items": map[string]any{
 							"type": "string",
 						},
 					},

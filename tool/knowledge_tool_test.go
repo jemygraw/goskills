@@ -306,8 +306,7 @@ func BenchmarkWikipediaSearch(b *testing.B) {
 	// This benchmark demonstrates the structure
 	// Real benchmarking would require a mock server or configurable URL
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// This will fail due to network issues, but benchmarks the request setup
 		_, err := WikipediaSearch("benchmark test query")
 		// Expected to fail due to network issues in benchmark environment

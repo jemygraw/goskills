@@ -35,11 +35,12 @@ type RunnerConfig struct {
 	APIBase          string
 	Model            string
 	SkillsDir        string
-	Verbose          bool
+	Verbose          int
 	Debug            bool
 	AutoApproveTools bool
 	AllowedScripts   []string
 	Loop             bool
+	SkillName        string
 }
 
 // NewAgent creates and initializes a new Agent.
@@ -73,7 +74,7 @@ func (a *Agent) Run(ctx context.Context, userPrompt string) (string, error) {
 	}
 
 	// --- STEP 3: SKILL EXECUTION (with Tool Calling) ---
-	if a.cfg.Verbose {
+	if a.cfg.Verbose >= 1 {
 		log.Info("executing skill (with potential tool calls)")
 		log.Info(strings.Repeat("-", 40))
 	}
@@ -123,7 +124,7 @@ func (a *Agent) RunLoop(ctx context.Context, initialPrompt string) error {
 // selectAndPrepareSkill discovers and selects the appropriate skill.
 func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*SkillPackage, error) {
 	// --- STEP 1: SKILL DISCOVERY ---
-	if a.cfg.Verbose {
+	if a.cfg.Verbose >= 1 {
 		log.Info("discovering available skills in %s...", a.cfg.SkillsDir)
 	}
 	availableSkills, err := a.discoverSkills(a.cfg.SkillsDir)
@@ -133,27 +134,50 @@ func (a *Agent) selectAndPrepareSkill(ctx context.Context, userPrompt string) (*
 	if len(availableSkills) == 0 {
 		return nil, errors.New("no valid skills found")
 	}
-	if a.cfg.Verbose {
+	if a.cfg.Verbose >= 1 {
 		log.Info("found %d skills", len(availableSkills))
 	}
 
 	// --- STEP 2: SKILL SELECTION ---
-	if a.cfg.Verbose {
-		log.Info("asking llm to select the best skill")
-	}
-	selectedSkillName, err := a.selectSkill(ctx, userPrompt, availableSkills)
-	if err != nil {
-		return nil, fmt.Errorf("failed during skill selection: %w", err)
+	var selectedSkillName string
+
+	// If skill is explicitly specified via --skill flag, use it directly
+	if a.cfg.SkillName != "" {
+		selectedSkillName = a.cfg.SkillName
+		if a.cfg.Verbose >= 1 {
+			log.Info("using explicitly specified skill: %s", selectedSkillName)
+		}
+	} else {
+		// Otherwise, ask LLM to select the best skill
+		if a.cfg.Verbose >= 1 {
+			log.Info("asking llm to select the best skill")
+		}
+		selectedSkillName, err = a.selectSkill(ctx, userPrompt, availableSkills)
+		if err != nil {
+			return nil, fmt.Errorf("failed during skill selection: %w", err)
+		}
+		if a.cfg.Verbose >= 1 {
+			log.Info("llm selected skill: %s", selectedSkillName)
+		}
 	}
 
 	selectedSkill, ok := availableSkills[selectedSkillName]
 	if !ok {
-		return nil, fmt.Errorf("llm selected a non-existent skill '%s'. aborting", selectedSkillName)
+		return nil, fmt.Errorf("skill '%s' not found. Available skills: %v", selectedSkillName, getAvailableSkillNames(availableSkills))
 	}
-	if a.cfg.Verbose {
-		log.Info("llm selected skill: %s", selectedSkillName)
+	if a.cfg.Verbose >= 1 {
+		log.Info("selected skill: %s", selectedSkillName)
 	}
 	return &selectedSkill, nil
+}
+
+// getAvailableSkillNames returns a slice of available skill names for error messages
+func getAvailableSkillNames(skills map[string]SkillPackage) []string {
+	names := make([]string, 0, len(skills))
+	for name := range skills {
+		names = append(names, name)
+	}
+	return names
 }
 
 func (a *Agent) discoverSkills(skillsRoot string) (map[string]SkillPackage, error) {
@@ -179,7 +203,12 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	for name, skill := range skills {
 		sb.WriteString(fmt.Sprintf("- %s: %s\n", name, skill.Meta.Description))
 	}
-	sb.WriteString("\nBased on the user request, which single skill is the most appropriate to use? Respond with only the name of the skill.")
+	sb.WriteString("\nSelection Guidelines:\n")
+	sb.WriteString("- For pure mathematical calculations (arithmetic, trigonometry, logarithms, etc.), ALWAYS prefer 'calculator-skill' over spreadsheet skills\n")
+	sb.WriteString("- Only choose spreadsheet skills (xlsx, csv) when the user needs to create/read/modify spreadsheet FILES\n")
+	sb.WriteString("- Function names that happen to exist in Excel do NOT make it a spreadsheet task\n")
+	sb.WriteString("\nBased on the user request and guidelines above, which single skill is the most appropriate to use?")
+	sb.WriteString("\n\nIMPORTANT: You MUST select exactly one skill from the above list, even if the request seems simple. Respond with ONLY the skill name, nothing else. Do not explain your choice or answer the question directly.")
 
 	skillPrompt := SkillsToPrompt(skills)
 
@@ -187,7 +216,7 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	selectionMessages := []openai.ChatCompletionMessage{
 		{
 			Role:    openai.ChatMessageRoleSystem,
-			Content: "You are an expert assistant that selects the most appropriate skill to handle a user's request. \n" + skillPrompt,
+			Content: "You are a skill selection assistant. Your ONLY job is to select the most appropriate skill from the available list. You must ALWAYS choose exactly one skill - never refuse to select or try to answer the question yourself.\n" + skillPrompt,
 		},
 		{
 			Role:    openai.ChatMessageRoleUser,
@@ -214,6 +243,12 @@ func (a *Agent) selectSkill(ctx context.Context, userPrompt string, skills map[s
 	// Extract just the skill name if there's extra text
 	// Look for skill names in the content
 	skillName := extractSkillName(content, skills)
+
+	if a.cfg.Verbose >= 1 {
+		fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+		fmt.Fprintf(os.Stderr, "Selected Skill: %s\n", skillName)
+		fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
+	}
 
 	return skillName, nil
 }
@@ -243,7 +278,7 @@ func extractSkillName(content string, skills map[string]SkillPackage) string {
 
 // debugPrintRequest prints the LLM request in debug mode
 func (a *Agent) debugPrintRequest(req openai.ChatCompletionRequest) {
-	if !a.cfg.Debug {
+	if a.cfg.Verbose < 2 {
 		return
 	}
 	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
@@ -269,7 +304,7 @@ func (a *Agent) debugPrintRequest(req openai.ChatCompletionRequest) {
 
 // debugPrintResponse prints the LLM response in debug mode
 func (a *Agent) debugPrintResponse(resp openai.ChatCompletionResponse) {
-	if !a.cfg.Debug {
+	if a.cfg.Verbose < 2 {
 		return
 	}
 	fmt.Fprintln(os.Stderr, strings.Repeat("=", 60))
@@ -329,7 +364,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 	var finalResponse strings.Builder
 
-	for i := 0; i < 20; i++ { // Limit to 20 iterations to prevent infinite loops
+	for range 20 { // Limit to 20 iterations to prevent infinite loops
 		req := openai.ChatCompletionRequest{
 			Model:    a.cfg.Model,
 			Messages: a.messages, // Use agent's messages
@@ -352,7 +387,7 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 		}
 
 		for _, tc := range msg.ToolCalls {
-			if a.cfg.Verbose {
+			if a.cfg.Verbose >= 1 {
 				log.Info("calling tool: %s with args: %s", tc.Function.Name, tc.Function.Arguments)
 			}
 
@@ -385,11 +420,11 @@ func (a *Agent) continueSkillWithTools(ctx context.Context, userPrompt string, s
 
 			// Check if it is an MCP tool
 			if a.mcpClient != nil && strings.Contains(tc.Function.Name, "__") {
-				var args map[string]interface{}
+				var args map[string]any
 				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 					toolOutput = fmt.Sprintf("Error unmarshalling arguments: %v", err)
 				} else {
-					var result interface{}
+					var result any
 					result, err = a.mcpClient.CallTool(ctx, tc.Function.Name, args)
 					if err == nil {
 						// Convert result to string/JSON

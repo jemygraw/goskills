@@ -28,7 +28,7 @@ func TestLoadConfig(t *testing.T) {
 	// Check default values (note: SkillsDir will be resolved to absolute path)
 	assert.Contains(t, cfg.SkillsDir, ".goskills/skills")
 	assert.True(t, cfg.AutoApproveTools)
-	assert.False(t, cfg.Verbose)
+	assert.Equal(t, 0, cfg.Verbose)
 	assert.False(t, cfg.Loop)
 }
 
@@ -52,7 +52,7 @@ func TestLoadConfig_WithFlags(t *testing.T) {
 	assert.Equal(t, "/test/skills", cfg.SkillsDir)
 	assert.Equal(t, "gpt-4", cfg.Model)
 	assert.Equal(t, "https://api.openai.com/v1", cfg.APIBase) // Should trim trailing slash
-	assert.True(t, cfg.Verbose)
+	assert.Equal(t, 1, cfg.Verbose)
 	assert.True(t, cfg.Loop)
 }
 

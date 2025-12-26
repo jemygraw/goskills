@@ -223,8 +223,7 @@ func BenchmarkTavilySearch(b *testing.B) {
 		return
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// This will fail due to network issues in benchmark environment, but it benchmarks the request setup
 		_, err := TavilySearch("benchmark test query")
 		_ = err // Ignore error for benchmarking purposes

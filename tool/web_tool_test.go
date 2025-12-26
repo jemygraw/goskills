@@ -192,7 +192,7 @@ func TestWebFetchWithLargeContent(t *testing.T) {
 	var htmlBuilder strings.Builder
 	htmlBuilder.WriteString("<html><head><title>Large Page</title></head><body>")
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		htmlBuilder.WriteString(fmt.Sprintf("<p>This is paragraph %d with some content.</p>", i))
 	}
 
@@ -229,8 +229,7 @@ func BenchmarkWebFetch(b *testing.B) {
 	}))
 	defer server.Close()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := WebFetch(server.URL)
 		if err != nil {
 			b.Fatalf("WebFetch() error = %v", err)

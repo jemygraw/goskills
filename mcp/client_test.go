@@ -158,7 +158,7 @@ func TestClient_CallTool(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test calling tool (may fail due to no real server)
-	result, err := client.CallTool(context.Background(), "test_tool", map[string]interface{}{})
+	result, err := client.CallTool(context.Background(), "test_tool", map[string]any{})
 
 	// Result handling depends on whether server is available
 	if err != nil {

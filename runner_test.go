@@ -410,7 +410,7 @@ This is a test skill.`
 		cfg: RunnerConfig{
 			Model:            "test-model",
 			SkillsDir:        tmpDir,
-			Verbose:          false,
+			Verbose:          0,
 			AutoApproveTools: true,
 		},
 		messages: []openai.ChatCompletionMessage{},
@@ -455,7 +455,7 @@ This is a test skill body.`
 		cfg: RunnerConfig{
 			Model:     "test-model",
 			SkillsDir: tmpDir,
-			Verbose:   false,
+			Verbose:   0,
 		},
 		messages: []openai.ChatCompletionMessage{},
 	}
@@ -477,7 +477,7 @@ func TestSelectAndPrepareSkill_NoSkills(t *testing.T) {
 		cfg: RunnerConfig{
 			Model:     "test-model",
 			SkillsDir: tmpDir,
-			Verbose:   false,
+			Verbose:   0,
 		},
 		messages: []openai.ChatCompletionMessage{},
 	}
@@ -1052,7 +1052,7 @@ This is a test skill.`
 		cfg: RunnerConfig{
 			Model:            "test-model",
 			SkillsDir:        tmpDir,
-			Verbose:          false,
+			Verbose:          0,
 			AutoApproveTools: true,
 		},
 		messages: []openai.ChatCompletionMessage{},
@@ -1095,7 +1095,7 @@ This is a test skill.`
 		cfg: RunnerConfig{
 			Model:     "test-model",
 			SkillsDir: tmpDir,
-			Verbose:   false,
+			Verbose:   0,
 		},
 		messages: []openai.ChatCompletionMessage{},
 	}
@@ -1103,5 +1103,5 @@ This is a test skill.`
 	skill, err := agent.selectAndPrepareSkill(context.Background(), "test prompt")
 	assert.Error(t, err)
 	assert.Nil(t, skill)
-	assert.Contains(t, err.Error(), "llm selected a non-existent skill")
+	assert.Contains(t, err.Error(), "not found")
 }

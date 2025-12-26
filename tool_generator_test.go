@@ -188,17 +188,17 @@ func TestGenerateScriptTool_ParametersStructure(t *testing.T) {
 	tool, _ := generateScriptTool(skillPath, scriptRelPath)
 
 	// Check that parameters is a map
-	assert.IsType(t, map[string]interface{}{}, tool.Function.Parameters)
+	assert.IsType(t, map[string]any{}, tool.Function.Parameters)
 
-	params := tool.Function.Parameters.(map[string]interface{})
+	params := tool.Function.Parameters.(map[string]any)
 	assert.Equal(t, "object", params["type"])
 	assert.Contains(t, params, "properties")
 
 	// Check properties structure
-	properties := params["properties"].(map[string]interface{})
+	properties := params["properties"].(map[string]any)
 	assert.Contains(t, properties, "args")
 
-	args := properties["args"].(map[string]interface{})
+	args := properties["args"].(map[string]any)
 	assert.Equal(t, "array", args["type"])
 	assert.Equal(t, "Arguments to pass to the script.", args["description"])
 }
