@@ -63,6 +63,10 @@ export OPENAI_API_BASE="https://api.deepseek.com/v1"
 
 # Run a skill using the runner
 ./goskills run "create a react component for a todo app"
+
+
+# Run a skill using the the specified skill
+ goskills run "calculate sin(radians(30))" --skill calculator-skill
 ```
 
 ## Built-in Tools
