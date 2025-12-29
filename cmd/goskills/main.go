@@ -319,14 +319,15 @@ func downloadFile(url, filepath string) error {
 		return fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(filepath)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
+	// Replace ~/.claude/skills with ~/.goskills/skills
+	replaceContent := strings.ReplaceAll(string(content), "~/.claude/skills", "~/.goskills/skills")
+
+	if err := os.WriteFile(filepath, []byte(replaceContent), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -346,7 +347,10 @@ func downloadDataURL(dataURL, filepath string) error {
 		return fmt.Errorf("failed to decode base64 data: %w", err)
 	}
 
-	if err := os.WriteFile(filepath, data, 0644); err != nil {
+	// Replace ~/.claude/skills with ~/.goskills/skills
+	replaceContent := strings.ReplaceAll(string(data), "~/.claude/skills", "~/.goskills/skills")
+
+	if err := os.WriteFile(filepath, []byte(replaceContent), 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
